@@ -26,7 +26,7 @@ async function main() {
       name: 'Tour Đà Nẵng 3N2Đ',
       description: 'Tham quan Bà Nà Hills + Hội An',
       basePrice: 5_000_000,
-      discount: 500_000,
+      discount: 10,
       categoryId: category.id,
     },
   });
