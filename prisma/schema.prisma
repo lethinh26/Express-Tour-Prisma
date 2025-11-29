@@ -29,10 +29,16 @@ enum PaymentMethod {
   BANK_TRANSFER
 }
 
+enum PromoType {
+  NEW
+  ALL
+}
+
+
 model User {
   id           Int        @id @default(autoincrement())
   name         String
-  email        String
+  email        String      @unique
   passwordHash String      @map("password_hash")
   role         Role        @default(USER)
   createdAt    DateTime    @default(now()) @map("created_at")
@@ -40,6 +46,7 @@ model User {
   orders       Order[]
   payments     Payment[]
   reviews      Review[]
+  promotionUsages PromotionUsage[]
 
   @@map("users")
 }
@@ -159,4 +166,28 @@ model Review {
   user      User       @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
 
   @@map("reviews")
+}
+
+model Promotion {
+  id          Int       @id @default(autoincrement())
+  discount    Int       
+  amount      Int
+  code        String    @unique @db.VarChar(20)
+  type        PromoType
+  name        String    @db.VarChar(30)
+  description String    @db.Text
+  startAt     DateTime  @default(now())
+  endAt       DateTime? @db.Timestamp(6)
+
+  promotionUsages PromotionUsage[]
+}
+
+model PromotionUsage {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  promotionId  Int
+  user       User        @relation(fields: [userId], references: [id])
+  promotion  Promotion    @relation(fields: [promotionId], references: [id])
+
+  @@unique([userId, promotionId])
 }

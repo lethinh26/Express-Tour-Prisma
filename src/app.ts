@@ -4,9 +4,10 @@ import tourRoutes from './routers/tour.routes';
 import tourImages from './routers/tourImage.routes';
 import category from './routers/category.routes';
 import tourDeparture from './routers/tourDeparture.routes';
+import cors from "cors";
 
 const app = express();
-
+app.use(cors());
 app.use(express.json());
 
 app.use('/api/payments', paymentRoutes);
