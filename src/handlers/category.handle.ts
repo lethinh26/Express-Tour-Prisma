@@ -4,6 +4,7 @@ import prisma from "../utils/prisma";
 export async function getCategory(req: Request, res: Response) {
     try {
         const category = await prisma.category.findMany({})
+        
         res.json(category)
     } catch (error) {
         console.error(error);
