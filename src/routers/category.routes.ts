@@ -6,7 +6,7 @@ import { getTourImgFirst } from '../handlers/tourImage.handle';
 const router = Router();
 
 router.get('/', getCategory)
-router.get('/:idCategory', getCategoryById)
+router.get('/:id', getCategoryById)
 router.post('/', createCategory)
 
 
