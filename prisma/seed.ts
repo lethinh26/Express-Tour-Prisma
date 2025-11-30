@@ -39,6 +39,21 @@ async function main() {
         ],
     });
 
+    await prisma.location.createMany({
+        data: [
+            { name: "Đà Nẵng" },
+            { name: "Phú Quốc" },
+            { name: "Ninh Bình" },
+            { name: "Huế - Hội An" },
+            { name: "Sapa" },
+            { name: "Hạ Long" },
+            { name: "Đà Lạt" },
+            { name: "Tây Ninh" },
+            { name: "Miền Tây" },
+            { name: "Nha Trang" },
+        ],
+    });
+
     await prisma.tour.createMany({
         data: [
             {
@@ -998,21 +1013,6 @@ async function main() {
                 startAt: new Date("2025-01-01T00:00:00"),
                 endAt: new Date("2025-12-31T23:59:59"),
             },
-        ],
-    });
-
-    await prisma.location.createMany({
-        data: [
-            { name: "Đà Nẵng" },
-            { name: "Phú Quốc" },
-            { name: "Ninh Bình" },
-            { name: "Huế - Hội An" },
-            { name: "Sapa" },
-            { name: "Hạ Long" },
-            { name: "Đà Lạt" },
-            { name: "Tây Ninh" },
-            { name: "Miền Tây" },
-            { name: "Nha Trang" },
         ],
     });
 
