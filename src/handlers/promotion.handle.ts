@@ -39,7 +39,6 @@ export async function createPromotion(req: Request, res: Response) {
   } catch (err: any) {
     console.error("createPromotion error:", err);
     if (err.code === "P2002") {
-      // unique constraint
       return res.status(409).json({ message: "Promotion code already exists" });
     }
     return res.status(500).json({ message: "Internal server error" });
