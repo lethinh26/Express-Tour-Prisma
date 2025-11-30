@@ -828,6 +828,7 @@ async function main() {
             },
         ],
     });
+    
 
     await prisma.tourImage.createMany({
         data: [
