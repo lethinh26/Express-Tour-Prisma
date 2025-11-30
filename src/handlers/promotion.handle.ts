@@ -45,7 +45,6 @@ export async function createPromotion(req: Request, res: Response) {
   }
 }
 
-
 export async function checkPromotionUsable(req: Request, res: Response) {
   try {
     const { code } = req.body;
@@ -148,7 +147,6 @@ export async function getPromotionByUserId(req: Request, res: Response) {
     return res.status(500).json({ message: "Internal server error" });
   }
 }
-
 
 export async function deletePromotionById(req: Request, res: Response) {
   try {
