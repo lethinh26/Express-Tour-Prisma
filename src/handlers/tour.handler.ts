@@ -18,13 +18,10 @@ export async function getTourById(req: Request, res: Response) {
         const tour = await prisma.tour.findUnique({
             where: {id : idParame}
         })
-
         if(!tour){
             return res.status(404).json({ message: 'Tour not found'})
         }
-
         res.json(tour)
-
     }catch(err){
         console.error(err)
         res.status(500).json({ error: 'Internal server error'})
@@ -34,7 +31,7 @@ export async function getTourById(req: Request, res: Response) {
 export async function createTour(req: Request, res: Response){
 
     try {
-        const {name, description, basePrice, discount, categoryId} = req.body
+        const { name, description, basePrice, discount, categoryId, information, address, locationId} = req.body
         
         if (!name || !description || !basePrice || !categoryId){
             return res.status(400).json({message: 'Missing required fields'})
@@ -46,10 +43,12 @@ export async function createTour(req: Request, res: Response){
                 description,
                 basePrice,
                 discount,
-                categoryId
+                categoryId,
+                information,
+                address,
+                locationId
             }
         })
-        
         res.status(201).json(tour)
 
     } catch (error) {

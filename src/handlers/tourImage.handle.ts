@@ -3,7 +3,9 @@ import prisma from "../utils/prisma";
 
 export async function getImageTour(req: Request, res: Response) {
     try {
-        const tourImage = await prisma.tourImage.findMany();
+        const tourImage = await prisma.tourImage.findMany({
+            where: {position: 0}
+        });
         res.json(tourImage)
     } catch (error) {
         console.error(error);
@@ -13,10 +15,10 @@ export async function getImageTour(req: Request, res: Response) {
 
 export async function getTourImgFirst(req: Request, res: Response) {
     try {
-        const tourId = Number(req.params.tourId)
+        const tourId = Number(req.params.id)
 
         const tourImage = await prisma.tourImage.findMany({
-            where: { tourId, position: 0 }
+            where: { tourId }
         })
 
         if (!tourImage || !tourImage.length) {

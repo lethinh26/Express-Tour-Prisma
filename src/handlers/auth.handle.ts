@@ -94,3 +94,54 @@ export async function getUser(req: Request, res: Response) {
         return res.status(401).json({ message: "Invalid or expired token" });
     }
 }
+
+export async function changePassword(req: Request, res: Response) {
+    try {
+        const { token, oldPassword, newPassword } = req.body;
+
+        if (!token || !oldPassword || !newPassword) {
+            return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        let decoded: any;
+        try {
+            decoded = jwt.verify(token, process.env.SECRET_KEY as string);
+        } catch (err) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const isOldPassValid = await argon2.verify(user.passwordHash, oldPassword);
+        console.log(isOldPassValid);
+        
+
+        if (!isOldPassValid) {
+            return res.status(400).json({ message: "Old password is not correct" });
+        }
+
+        if (oldPassword === newPassword) {
+            return res.status(400).json({ message: "New password must be different from old password" });
+        }
+
+        const newHashedPass = await argon2.hash(newPassword);
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                passwordHash: newHashedPass,
+            },
+        });
+
+        return res.status(200).json({ message: "Password changed successfully" });
+
+    } catch (error: any) {
+        console.log("Change Password Error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
