@@ -15,7 +15,7 @@ export async function getTourDeparture(req: Request, res: Response) {
 export async function getTourDepartureByTourId(req: Request, res: Response) {
     try {
         const id = Number(req.params.id);
-        const tourDepartureById = await prisma.tourDeparture.findFirst({
+        const tourDepartureById = await prisma.tourDeparture.findMany({
             where: { tourId: id },
         });
 

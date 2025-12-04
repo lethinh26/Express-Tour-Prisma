@@ -5,26 +5,25 @@ const jwt = require("jsonwebtoken");
 
 export async function createAccount(req: Request, res: Response) {
     try {
-        const { name, email, passwordHash, role } = req.body;
-        if (!name || !email || !passwordHash || !role) {
+        const { name, email, password } = req.body;
+        if (!name || !email || !password ) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
-        const hasedPass = await argon2.hash(passwordHash);
-
+        const hasedPass = await argon2.hash(password);
         const account = await prisma.user.create({
             data: {
                 name,
                 email,
                 passwordHash: hasedPass,
-                role,
+                role: "USER",
                 createdAt: new Date(),
             },
         });
-
+        const {passwordHash, ...acc} = account 
         const token = jwt.sign({ id: account.id }, process.env.SECRET_KEY, { expiresIn: "24h" });
 
-        return res.status(201).json({ account, token });
+        return res.status(201).json({ account: acc, token });
     } catch (error: any) {
         if (error.code === "P2002") {
             return res.status(409).json({ message: "Email already exists" });
@@ -35,8 +34,8 @@ export async function createAccount(req: Request, res: Response) {
 
 export async function login(req: Request, res: Response) {
     try {
-        const { email, passwordHash } = req.body;
-        if (!email || !passwordHash) {
+        const { email, password } = req.body;
+        if (!email || !password) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
@@ -48,7 +47,7 @@ export async function login(req: Request, res: Response) {
             return res.status(404).json({ message: "Email or password is not correct" });
         }
 
-        const isPassValid = await argon2.verify(user.passwordHash, passwordHash);
+        const isPassValid = await argon2.verify(user.passwordHash, password);
 
         if (!isPassValid) {
             return res.status(404).json({ message: "Email or password is not correct" });
@@ -86,4 +85,3 @@ export async function getUser(req: Request, res: Response) {
     }
 }
 
-        

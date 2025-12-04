@@ -47,6 +47,7 @@ model User {
   payments     Payment[]
   reviews      Review[]
   promotionUsages PromotionUsage[]
+  favoriteTours TourFavorite[]
 
 }
 
