@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createTourDeparture, getTourDeparture, getTourDepartureByTourId } from '../handlers/tourDeparture.hanle';
+import { createTourDeparture, deleteTourDeparture, getTourDeparture, getTourDepartureByTourId, updateTourDeparture } from '../handlers/tourDeparture.hanle';
 
 
 const router = Router();
@@ -7,5 +7,7 @@ const router = Router();
 router.get('/', getTourDeparture);
 router.get('/:id', getTourDepartureByTourId); 
 router.post('/', createTourDeparture);
+router.patch('/:id', updateTourDeparture);
+router.delete('/:id', deleteTourDeparture);
 
 export default router;

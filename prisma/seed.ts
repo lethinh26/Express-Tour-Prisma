@@ -5,14 +5,23 @@ const prisma = new PrismaClient();
 async function main() {
     console.log("CREATE SEED...");
 
-    // await prisma.user.create({
-    //     data: {
-    //         name: "admin",
-    //         email: "admin@gmail.com",
-    //         passwordHash: "123456789",
-    //         role: Role.ADMIN,
-    //     },
-    // });
+    await prisma.user.createMany({
+        data: [
+          {
+            id: 1,
+            name: "admin",
+            email: "admin@gmail.com",
+            passwordHash: "123456789",
+            role: Role.ADMIN,
+          },
+          {
+            name: "tourist",
+            email: "tourist@gmail.com",
+            passwordHash: "123456",
+            role: Role.TOUR_MANAGER,
+          }
+      ]
+    });
 
     await prisma.category.createMany({
         data: [
@@ -180,6 +189,7 @@ async function main() {
                 address: "Thành phố Đà Nẵng, Việt Nam",
                 basePrice: 5000000,
                 discount: 10,
+                createdBy: 1,
                 categoryId: 1,
                 locationId: 1,
             },
@@ -321,6 +331,7 @@ async function main() {
                 address: "Thành phố Phú Quốc, tỉnh Kiên Giang, Việt Nam",
                 basePrice: 6500000,
                 discount: 8,
+                createdBy: 1,
                 categoryId: 1,
                 locationId: 3,
             },
@@ -454,6 +465,7 @@ async function main() {
                 address: "Ninh Bình, Việt Nam",
                 basePrice: 5000000,
                 discount: 10,
+                createdBy: 1,
                 categoryId: 1,
                 locationId: 2,
             },
@@ -584,6 +596,7 @@ async function main() {
                 address: "Huế – Hội An, Miền Trung Việt Nam",
                 basePrice: 4000000,
                 discount: 7,
+                createdBy: 1,
                 categoryId: 2,
                 locationId: 4,
             },
@@ -714,7 +727,8 @@ async function main() {
                 address: "Thị trấn Sapa, tỉnh Lào Cai, Việt Nam",
                 basePrice: 4800000,
                 discount: 12,
-                categoryId: 5,
+                createdBy: 1,
+                categoryId: 4,
                 locationId: 7,
             },
 
@@ -838,12 +852,12 @@ async function main() {
                 address: "Thành phố Hạ Long, tỉnh Quảng Ninh, Việt Nam",
                 basePrice: 4200000,
                 discount: 6,
+                createdBy: 1,
                 categoryId: 4,
                 locationId: 8,
             },
         ],
     });
-    
 
     await prisma.tourImage.createMany({
         data: [
@@ -1015,7 +1029,14 @@ async function main() {
             },
         ],
     });
-
+    await prisma.tourFavorited.createMany({
+        data: [
+            { userId: 1, tourId: 2 },
+            { userId: 1, tourId: 3 },
+            { userId: 2, tourId: 1 },
+        ],
+        skipDuplicates: true, 
+    });
     console.log("DONE");
 }
 
