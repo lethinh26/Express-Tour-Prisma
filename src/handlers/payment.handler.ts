@@ -73,3 +73,62 @@ export async function createPayment(req: Request, res: Response) {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+export async function updatePayment(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    const { amount, method, status } = req.body;
+
+    const updateData: any = {}
+    if (amount !== undefined) updateData.amount = amount
+    if (method) {
+      if (!Object.values(PaymentMethod).includes(method)) {
+        return res.status(400).json({ message: 'Invalid payment method' });
+      }
+      updateData.method = method
+    }
+    if (status) {
+      if (!Object.values(PaymentStatus).includes(status)) {
+        return res.status(400).json({ message: 'Invalid payment status' });
+      }
+      updateData.status = status
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({message: 'At least one field is required to update'})
+    }
+
+    const payment = await prisma.payment.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json(payment);
+
+  } catch (error: any) {
+    console.error(error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({message: 'Payment not found'})
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function deletePayment(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.payment.delete({
+      where: { id }
+    });
+
+    res.json({message: 'Payment deleted successfully'});
+
+  } catch (error: any) {
+    console.error(error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({message: 'Payment not found'})
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}

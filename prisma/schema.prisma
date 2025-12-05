@@ -85,8 +85,6 @@ model Tour {
   departures  TourDeparture[]
   reviews     Review[]
   favorites   TourFavorited[]
-
-
 }
 
 model TourImage {
@@ -153,7 +151,6 @@ model Payment {
 
   userId    Int
   user      User            @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Restrict)
-
 }
 
 model Review {

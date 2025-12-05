@@ -54,3 +54,54 @@ export async function createTourDeparture(req: Request, res: Response) {
         res.status(500).json({ message: "Invalid category" });
     }
 }
+
+export async function updateTourDeparture(req: Request, res: Response) {
+    try {
+        const id = Number(req.params.id);
+        const { departure, price, capacity, availableSeats, tourId } = req.body;
+        
+        const updateData: any = {}
+        if (departure) updateData.departure = departure
+        if (price) updateData.price = price
+        if (capacity !== undefined) updateData.capacity = capacity
+        if (availableSeats !== undefined) updateData.availableSeats = availableSeats
+        if (tourId) updateData.tourId = tourId
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({message: 'At least one field is required to update'})
+        }
+
+        const tourDeparture = await prisma.tourDeparture.update({
+            where: { id },
+            data: updateData
+        });
+
+        res.json(tourDeparture);
+
+    } catch (error: any) {
+        console.error(error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({message: 'TourDeparture not found'})
+        }
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export async function deleteTourDeparture(req: Request, res: Response) {
+    try {
+        const id = Number(req.params.id);
+
+        await prisma.tourDeparture.delete({
+            where: { id }
+        });
+
+        res.json({message: 'TourDeparture deleted successfully'});
+
+    } catch (error: any) {
+        console.error(error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({message: 'TourDeparture not found'})
+        }
+        res.status(500).json({ message: "Internal server error" });
+    }
+}

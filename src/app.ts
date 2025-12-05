@@ -9,6 +9,7 @@ import cors from "cors";
 import location from "./routers/location.routes";
 import promotion from "./routers/promotion.routes";
 import favoriteTour from "./routers/favoriteTour.routes";
+import booking from "./routers/booking.routes";
 
 const app = express();
 app.use(cors());
@@ -23,6 +24,8 @@ app.use('/api/auth', auth);
 app.use('/api/locations', location);
 app.use('/api/promotions', promotion);
 app.use('/api/favoriteTours', favoriteTour);
+app.use('/api/promotions', promotion);    
+app.use('/api/bookings', booking);
 
 
 export default app;
