@@ -63,12 +63,8 @@ export async function login(req: Request, res: Response) {
 
 
 export async function getUser(req: Request, res: Response) {
-    
     try {        
-        console.log("bruh");
-
         const { token } = req.body;
-        console.log("token", token);
         
         if (!token) {
             return res.status(400).json({ message: "Missing token" });
@@ -78,9 +74,7 @@ export async function getUser(req: Request, res: Response) {
             return res.status(500).json({ message: "Missing JWT secret key" });
         }
 
-        const decoded = jwt.verify(token, process.env.SECRET_KEY);
-        console.log("decoded", decoded);
-        
+        const decoded = jwt.verify(token, process.env.SECRET_KEY) as JwtPayload;
 
         if (!decoded || !decoded.id) {
             return res.status(401).json({ message: "Invalid token payload" });
