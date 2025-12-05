@@ -50,6 +50,7 @@ model User {
   promotionUsages PromotionUsage[]
   favorites   TourFavorited[]
   toursCreated Tour[]
+  promotionUser PromotionUser[]
 }
 
 model Category {
@@ -108,7 +109,6 @@ model TourDeparture {
   tour             Tour        @relation(fields: [tourId], references: [id], onUpdate: Cascade, onDelete: Cascade)
 
   items            OrderItem[]
-
 }
 
 model Order {
@@ -178,6 +178,7 @@ model Promotion {
   endAt       DateTime? @db.Timestamp(6)
 
   promotionUsages PromotionUsage[]
+  promotionUser PromotionUser[]
 }
 
 model PromotionUsage {
@@ -186,6 +187,18 @@ model PromotionUsage {
   promotionId  Int
   user       User        @relation(fields: [userId], references: [id])
   promotion  Promotion    @relation(fields: [promotionId], references: [id])
+
+  @@unique([userId, promotionId])
+}
+
+model PromotionUser {
+  id          Int         @id @default(autoincrement())
+  
+  userId      Int
+  user        User        @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  promotionId Int
+  promotion   Promotion   @relation(fields: [promotionId], references: [id], onUpdate: Cascade, onDelete: Cascade)
 
   @@unique([userId, promotionId])
 }

@@ -1037,6 +1037,16 @@ async function main() {
         ],
         skipDuplicates: true, 
     });
+
+    await prisma.promotionUser.createMany({
+        data: [
+            { userId: 1, promotionId: 1 },
+            { userId: 1, promotionId: 3 },
+            { userId: 2, promotionId: 2 },
+        ],
+        skipDuplicates: true, 
+    });
+
     console.log("DONE");
 }
 
