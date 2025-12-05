@@ -49,3 +49,47 @@ export async function createLocation(req: Request, res: Response) {
         res.status(500).json({ message: 'Internal server error' })
     }
 }
+
+export async function updateLocation(req: Request, res: Response) {
+    try {
+        const id = Number(req.params.id)
+        const {name} = req.body
+        
+        if (!name) {
+            return res.status(400).json({message: 'Name is required'})
+        }
+
+        const location = await prisma.location.update({
+            where: { id },
+            data: { name }
+        })
+
+        res.json(location)
+
+    } catch (error: any) {
+        console.error(error)
+        if (error.code === 'P2025') {
+            return res.status(404).json({message: 'Location not found'})
+        }
+        res.status(500).json({message: 'Internal server error'})
+    }
+}
+
+export async function deleteLocation(req: Request, res: Response) {
+    try {
+        const id = Number(req.params.id)
+
+        await prisma.location.delete({
+            where: { id }
+        })
+
+        res.json({message: 'Location deleted successfully'})
+
+    } catch (error: any) {
+        console.error(error)
+        if (error.code === 'P2025') {
+            return res.status(404).json({message: 'Location not found'})
+        }
+        res.status(500).json({message: 'Internal server error'})
+    }
+}

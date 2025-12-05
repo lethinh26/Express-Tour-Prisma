@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../utils/prisma";
 import argon2 from "argon2";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 export async function createAccount(req: Request, res: Response) {
     try {
@@ -88,7 +88,8 @@ export async function getUser(req: Request, res: Response) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        return res.json({ user });
+        const { passwordHash, ...rest } = user;
+        return res.json(rest);
 
     } catch (error: any) {
         return res.status(401).json({ message: "Invalid or expired token" });

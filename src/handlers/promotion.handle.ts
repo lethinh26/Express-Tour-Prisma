@@ -45,6 +45,68 @@ export async function createPromotion(req: Request, res: Response) {
   }
 }
 
+export async function updatePromotion(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    const {
+      discount,
+      amount,
+      code,
+      type,
+      name,
+      description,
+      startAt,
+      endAt,
+    } = req.body;
+    console.log(description);
+    
+
+    if (!id || Number.isNaN(id)) {
+      return res.status(400).json({ message: "Invalid promotion id" });
+    }
+
+    const updateData: any = {};
+    if (discount !== undefined) {
+      if (discount < 0) {
+        return res.status(400).json({ message: "discount must be >= 0" });
+      }
+      updateData.discount = discount;
+    }
+    if (amount !== undefined) {
+      if (amount < 0) {
+        return res.status(400).json({ message: "amount must be >= 0" });
+      }
+      updateData.amount = amount;
+    }
+    if (code) updateData.code = code;
+    if (type) updateData.type = type;
+    if (name) updateData.name = name;
+    if (description) updateData.description = description;
+    if (startAt) updateData.startAt = new Date(startAt);
+    if (endAt !== undefined) updateData.endAt = endAt ? new Date(endAt) : null;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "At least one field is required to update" });
+    }
+
+    const promotion = await prisma.promotion.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return res.json(promotion);
+  } catch (err: any) {
+    console.error("updatePromotion error:", err);
+    if (err.code === "P2025") {
+      return res.status(404).json({ message: "Promotion not found" });
+    }
+    if (err.code === "P2002") {
+      return res.status(409).json({ message: "Promotion code already exists" });
+    }
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 export async function checkPromotionUsable(req: Request, res: Response) {
   try {
     const { code } = req.body;
