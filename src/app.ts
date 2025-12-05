@@ -24,7 +24,6 @@ app.use('/api/auth', auth);
 app.use('/api/locations', location);
 app.use('/api/promotions', promotion);
 app.use('/api/favoriteTours', favoriteTour);
-app.use('/api/promotions', promotion);    
 app.use('/api/bookings', booking);
 
 
