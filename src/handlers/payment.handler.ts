@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
-import crypto from 'crypto';
 
 export async function getPayments(req: Request, res: Response) {
   try {
@@ -87,10 +86,18 @@ export async function createPayment(req: Request, res: Response) {
         amount,
         method,
         status,
+        description: '', 
       },
     });
 
-    res.status(201).json(payment);
+    const description = `TOUR-PAYMENT-${payment.id}`;
+    
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: { description }
+    });
+
+    res.status(201).json(updatedPayment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -100,10 +107,11 @@ export async function createPayment(req: Request, res: Response) {
 export async function updatePayment(req: Request, res: Response) {
   try {
     const id: string = req.params.id;
-    const { amount, method, status } = req.body;
+    const { amount, method, status, description } = req.body;
 
     const updateData: any = {}
     if (amount !== undefined) updateData.amount = amount
+    if (description !== undefined) updateData.description = description
     if (method) {
       if (!Object.values(PaymentMethod).includes(method)) {
         return res.status(400).json({ message: 'Invalid payment method' });
@@ -188,109 +196,191 @@ export async function createOrderItem(req: Request, res: Response) {
   }
 }
 
-function verifySepaySignature(data: any, receivedSignature: string): boolean {
-  try {
-    const secretKey = process.env.SEPAY_SECRET_KEY || process.env.SECRET_KEY;
-    
-    if (!secretKey) {
-      console.error('SEPAY_SECRET_KEY not configured');
-      return false;
-    }
-
-    const signString = `${data.transaction_id}${data.payment_id}${data.amount}${data.status}`;
-    
-    const expectedSignature = crypto
-      .createHmac('sha256', secretKey)
-      .update(signString)
-      .digest('hex');
-    
-    console.log('Signature verification:', {
-      received: receivedSignature,
-      expected: expectedSignature,
-      match: expectedSignature === receivedSignature
-    });
-
-    return expectedSignature === receivedSignature;
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-}
-
+// IPN Handler for SePay payment notifications
 export async function handleSepayIPN(req: Request, res: Response) {
   try {
-    console.log('SePay IPN received:', req.body);
+    console.log('=== SePay IPN Received ===');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
     
+    // Verify API Key từ header Authorization
+    const authHeader = req.headers.authorization;
+    const apiKey = process.env.SEPAY_SECRET_KEY;
+
+    if (!authHeader) {
+      console.error('Missing Authorization header');
+      return res.status(401).json({ error: 'Unauthorized: Missing Authorization header' });
+    }
+
+    if (!apiKey) {
+      console.error('SEPAY_SECRET_KEY not configured in .env');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    // SePay gửi "Authorization: Apikey YOUR_SECRET_KEY"
+    if (authHeader !== apiKey && authHeader !== `Apikey ${apiKey}`) {
+      console.error('Invalid API Key:', authHeader);
+      return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+    }
+
     const { 
-      transaction_id,
-      payment_id,
-      amount,
-      status,
-      signature
+      id,                   
+      gateway,               
+      transactionDate,
+      accountNumber,
+      code,
+      content,
+      transferType,
+      transferAmount,
+      accumulated,           
+      subAccount,            
+      referenceCode,         
+      description            
     } = req.body;
 
-    if (!signature) {
-      console.error('Missing signature in IPN request');
-      return res.status(400).json({ error: 'Missing signature' });
-    }
-
-    const isValidSignature = verifySepaySignature(req.body, signature);
-    if (!isValidSignature) {
-      console.error('Invalid signature from SePay');
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-
-    if (!payment_id) {
-      return res.status(400).json({ error: 'Missing payment_id' });
-    }
-
-    const payment = await prisma.payment.findUnique({
-      where: { id: payment_id }
+    console.log('Transaction details:', {
+      id,
+      gateway,
+      transferAmount,
+      content,
+      transferType,
+      transactionDate
     });
 
-    if (!payment) {
-      console.error('Payment not found:', payment_id);
-      return res.status(404).json({ error: 'Payment not found' });
-    }
-
-    if (payment.status === 'SUCCESS') {
-      console.log('Payment already processed:', payment_id);
+    if (transferType !== 'in') {
+      console.log('Skipping outbound transaction');
       return res.json({ 
         success: true, 
-        message: 'Payment already processed' 
+        message: 'Outbound transaction ignored' 
       });
     }
 
-    let newStatus: PaymentStatus;
-    
-    if (status === 'SUCCESS') {
-      newStatus = PaymentStatus.SUCCESS;
-    } else if (status === 'FAILED') {
-      newStatus = PaymentStatus.FAILED;
-    } else {
-      newStatus = PaymentStatus.PENDING;
+    let paymentId: string | null = null;
+
+    // Cách 1: Tìm payment_id trong content
+    const contentMatch = content?.match(/TOUR[- ]PAYMENT[- ]([a-f0-9\-]{36})/i);
+    if (contentMatch) {
+      paymentId = contentMatch[1];
     }
 
+    // Cách 2: Nếu code chứa payment_id
+    if (!paymentId && code) {
+      paymentId = code;
+    }
+
+    // Cách 3: Tìm payment theo số tiền và status PENDING (fallback)
+    if (!paymentId) {
+      console.log('Payment ID not found in content/code, searching by amount...');
+      const pendingPayment = await prisma.payment.findFirst({
+        where: {
+          amount: transferAmount,
+          status: PaymentStatus.PENDING
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (pendingPayment) {
+        paymentId = pendingPayment.id;
+        console.log('Found pending payment by amount:', paymentId);
+      }
+    }
+
+    if (!paymentId) {
+      console.error('Payment ID not found in transaction content or code');
+      return res.json({ 
+        success: true, 
+        message: 'Payment ID not found, transaction logged',
+        transaction_id: id
+      });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId }
+    });
+
+    if (!payment) {
+      console.error('Payment not found in database:', paymentId);
+      return res.json({ 
+        success: true, 
+        message: 'Payment not found in database',
+        transaction_id: id
+      });
+    }
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      console.log('Payment already processed:', paymentId);
+      return res.json({ 
+        success: true, 
+        message: 'Payment already processed',
+        payment_id: paymentId,
+        transaction_id: id
+      });
+    }
+
+    const contentUpper = content?.toUpperCase().trim();
+    const descriptionUpper = payment.description?.toUpperCase().trim();
+    
+    if (contentUpper !== descriptionUpper) {
+      console.error('Content mismatch:', {
+        expected: payment.description,
+        received: content
+      });
+      // Vẫn trả success nhưng không cập nhật
+      return res.json({ 
+        success: true, 
+        message: 'Content mismatch, payment not updated',
+        payment_id: paymentId,
+        transaction_id: id
+      });
+    }
+
+    // Kiểm tra số tiền khớp
+    if (Number(payment.amount) !== transferAmount) {
+      console.error('Amount mismatch:', {
+        expected: payment.amount,
+        received: transferAmount
+      });
+      // Vẫn trả success nhưng không cập nhật
+      return res.json({ 
+        success: true, 
+        message: 'Amount mismatch, payment not updated',
+        payment_id: paymentId,
+        transaction_id: id
+      });
+    }
+
+    // Cập nhật payment status thành SUCCESS
     const updatedPayment = await prisma.payment.update({
-      where: { id: payment_id },
+      where: { id: paymentId },
       data: {
-        status: newStatus,
+        status: PaymentStatus.SUCCESS,
         method: PaymentMethod.BANK_TRANSFER,
+        // Có thể lưu thêm thông tin giao dịch vào note/metadata nếu cần
       }
     });
 
-    console.log('Payment updated:', updatedPayment);
+    console.log('Payment updated successfully:', {
+      payment_id: paymentId,
+      transaction_id: id,
+      amount: transferAmount,
+      gateway,
+      status: 'SUCCESS'
+    });
 
+    // Trả về success để SePay biết đã nhận và xử lý
     return res.json({ 
       success: true, 
       message: 'IPN processed successfully',
-      payment_id: payment_id,
-      status: newStatus
+      payment_id: paymentId,
+      transaction_id: id,
+      status: 'SUCCESS'
     });
 
   } catch (err) {
     console.error('SePay IPN Error:', err);
-    // 200 để SePay không retry liên tục
+    // Vẫn trả về 200 để SePay không retry liên tục
     res.status(200).json({ 
       success: false, 
       error: 'Internal server error' 
