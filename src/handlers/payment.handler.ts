@@ -271,13 +271,16 @@ export async function handleSepayIPN(req: Request, res: Response) {
 
     let paymentId: string | null = null;
 
-    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9-]{32,36})/i);
+    // Tìm UUID format: 8-4-4-4-12 hoặc 32 ký tự hex liên tiếp
+    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/i);
     if (contentMatch) {
       let extractedId = contentMatch[1];
+      // Nếu không có dấu gạch ngang (32 ký tự), thêm vào đúng format UUID
       if (extractedId.length === 32) {
         extractedId = `${extractedId.slice(0,8)}-${extractedId.slice(8,12)}-${extractedId.slice(12,16)}-${extractedId.slice(16,20)}-${extractedId.slice(20)}`;
       }
       paymentId = extractedId;
+      console.log('Extracted payment ID:', paymentId);
     }
 
     // Cách 2: Nếu code chứa payment_id
