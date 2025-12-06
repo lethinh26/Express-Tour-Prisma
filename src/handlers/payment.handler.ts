@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import crypto from 'crypto';
 
 export async function getPayments(req: Request, res: Response) {
   try {
@@ -184,5 +185,115 @@ export async function createOrderItem(req: Request, res: Response) {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+function verifySepaySignature(data: any, receivedSignature: string): boolean {
+  try {
+    const secretKey = process.env.SEPAY_SECRET_KEY || process.env.SECRET_KEY;
+    
+    if (!secretKey) {
+      console.error('SEPAY_SECRET_KEY not configured');
+      return false;
+    }
+
+    const signString = `${data.transaction_id}${data.payment_id}${data.amount}${data.status}`;
+    
+    const expectedSignature = crypto
+      .createHmac('sha256', secretKey)
+      .update(signString)
+      .digest('hex');
+    
+    console.log('Signature verification:', {
+      received: receivedSignature,
+      expected: expectedSignature,
+      match: expectedSignature === receivedSignature
+    });
+
+    return expectedSignature === receivedSignature;
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
+
+export async function handleSepayIPN(req: Request, res: Response) {
+  try {
+    console.log('SePay IPN received:', req.body);
+    
+    const { 
+      transaction_id,
+      payment_id,
+      amount,
+      status,
+      signature
+    } = req.body;
+
+    if (!signature) {
+      console.error('Missing signature in IPN request');
+      return res.status(400).json({ error: 'Missing signature' });
+    }
+
+    const isValidSignature = verifySepaySignature(req.body, signature);
+    if (!isValidSignature) {
+      console.error('Invalid signature from SePay');
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    if (!payment_id) {
+      return res.status(400).json({ error: 'Missing payment_id' });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: payment_id }
+    });
+
+    if (!payment) {
+      console.error('Payment not found:', payment_id);
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    if (payment.status === 'SUCCESS') {
+      console.log('Payment already processed:', payment_id);
+      return res.json({ 
+        success: true, 
+        message: 'Payment already processed' 
+      });
+    }
+
+    let newStatus: PaymentStatus;
+    
+    if (status === 'SUCCESS') {
+      newStatus = PaymentStatus.SUCCESS;
+    } else if (status === 'FAILED') {
+      newStatus = PaymentStatus.FAILED;
+    } else {
+      newStatus = PaymentStatus.PENDING;
+    }
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment_id },
+      data: {
+        status: newStatus,
+        method: PaymentMethod.BANK_TRANSFER,
+      }
+    });
+
+    console.log('Payment updated:', updatedPayment);
+
+    return res.json({ 
+      success: true, 
+      message: 'IPN processed successfully',
+      payment_id: payment_id,
+      status: newStatus
+    });
+
+  } catch (err) {
+    console.error('SePay IPN Error:', err);
+    // 200 để SePay không retry liên tục
+    res.status(200).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
   }
 }
