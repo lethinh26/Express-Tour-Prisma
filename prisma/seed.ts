@@ -1047,6 +1047,23 @@ async function main() {
         skipDuplicates: true, 
     });
 
+    await prisma.order.create({
+        data: {
+            id: 1,
+            userId: 1,
+            status: OrderStatus.PENDING,
+            items: {
+                create: [
+                    {
+                        quantity: 1,
+                        unitPrice: 2000,
+                        tourDepartureId: 1
+                    }
+                ]
+            }
+        }
+    });
+
     console.log("DONE");
 }
 
