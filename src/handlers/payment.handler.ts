@@ -90,7 +90,7 @@ export async function createPayment(req: Request, res: Response) {
       },
     });
 
-    const description = `TOUR-PAYMENT-${payment.id}`;
+    const description = `TOUR PAYMENT ${payment.id}`;
     
     const updatedPayment = await prisma.payment.update({
       where: { id: payment.id },
@@ -257,8 +257,8 @@ export async function handleSepayIPN(req: Request, res: Response) {
 
     let paymentId: string | null = null;
 
-    // Cách 1: Tìm payment_id trong content
-    const contentMatch = content?.match(/TOUR[- ]PAYMENT[- ]([a-f0-9\-]{36})/i);
+    // Cách 1: Tìm payment_id trong content (format: TOUR PAYMENT uuid hoặc TOUR-PAYMENT-uuid)
+    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9-]{36})/i);
     if (contentMatch) {
       paymentId = contentMatch[1];
     }
