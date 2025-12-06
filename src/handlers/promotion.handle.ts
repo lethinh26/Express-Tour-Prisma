@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../utils/prisma";
+const jwt = require("jsonwebtoken");
 
 export async function createPromotion(req: Request, res: Response) {
   try {
@@ -322,5 +323,68 @@ export async function getPromotion(req: Request, res: Response) {
   } catch (err) {
     console.error("getPromotion error:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function getPromotionByToken(req: Request, res: Response) {
+  try {
+    const token = req.params.token
+
+    if (!token) {
+      return res.status(400).json({ message: "Missing required fields" })
+    }
+    const decoded = jwt.verify(token, process.env.SECRET_KEY)
+    if (!decoded) {
+      return res.status(401).json({ message: "Invalid token" })
+    }
+
+    const { userId } = decoded
+    const promotionUser = await prisma.promotionUser.findMany({
+      where: { userId }
+    })
+    if (!promotionUser) {
+      console.log(token);
+      return res.status(200).json({ promotions: [] })
+    }
+
+    const promotion = await prisma.promotion.findMany({
+      where: { id: { in: promotionUser.map(pr => pr.promotionId) } }
+    })
+
+    return res.status(200).json({ promotion })
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" })
+  }
+}
+
+export async function createPromotionUser(req: Request, res: Response) {
+  try {
+    const { promotionId, token } = req.body
+    
+    console.log(promotionId, token);
+    if (!token || !promotionId) {
+      return res.status(400).json({ message: "Missing required fields" })
+    }
+
+    const decoded = jwt.verify(token, process.env.SECRET_KEY)
+    if (!decoded) {
+      return res.status(401).json({ message: "Invalid Token" })
+    }
+
+    const checkExist = await prisma.promotionUser.findMany({
+      where: { userId: decoded.id, promotionId }
+    })
+    if (checkExist.length) {
+      return res.status(402).json({ message: "Information is existed" })
+    }
+    const promotionUser = await prisma.promotionUser.create({
+      data: {
+        userId: decoded.id,
+        promotionId
+      }
+    })
+    return res.status(200).json({ message: "PromotionUser Create SuccessFully", promotionUser })
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" })
   }
 }

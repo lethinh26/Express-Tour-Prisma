@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPayment, deletePayment, getPaymentById, getPayments, updatePayment } from '../handlers/payment.handler';
+import { createPayment, getPaymentById, getPayments, updatePayment, createOrder, createOrderItem, handleSepayIPN } from '../handlers/payment.handler';
 
 
 const router = Router();
@@ -7,6 +7,9 @@ router.get('/', getPayments);
 router.get('/:id', getPaymentById);
 router.post('/', createPayment);
 router.patch('/:id', updatePayment);
-router.delete('/:id', deletePayment);
+router.post('/order', createOrder);
+router.post('/order-item', createOrderItem);
+router.post('/sepay-ipn', handleSepayIPN); // IPN endpoint for SePay
+
 
 export default router;

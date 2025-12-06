@@ -7,7 +7,11 @@ export async function getPayments(req: Request, res: Response) {
     const payments = await prisma.payment.findMany({
       include: {
         user: true,
-        order: true,
+        order: {
+          include: {
+            items: true,
+          },
+        },
       },
     });
 
@@ -20,13 +24,31 @@ export async function getPayments(req: Request, res: Response) {
 
 export async function getPaymentById(req: Request, res: Response) {
   try {
-    const id = Number(req.params.id);
+    const id: string = req.params.id;
 
     const payment = await prisma.payment.findUnique({
       where: { id },
       include: {
         user: true,
-        order: true,
+        order: {
+          include: {
+            items: {
+              include: {
+                departure: {
+                  include: {
+                    tour: {
+                      include: {
+                        images: true,
+                        location: true,
+                        category: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
     });
 
@@ -76,7 +98,7 @@ export async function createPayment(req: Request, res: Response) {
 
 export async function updatePayment(req: Request, res: Response) {
   try {
-    const id = Number(req.params.id);
+    const id: string = req.params.id;
     const { amount, method, status } = req.body;
 
     const updateData: any = {}
@@ -114,21 +136,53 @@ export async function updatePayment(req: Request, res: Response) {
   }
 }
 
-export async function deletePayment(req: Request, res: Response) {
+export async function createOrder(req: Request, res: Response) {
   try {
-    const id = Number(req.params.id);
-
-    await prisma.payment.delete({
-      where: { id }
-    });
-
-    res.json({message: 'Payment deleted successfully'});
-
-  } catch (error: any) {
-    console.error(error);
-    if (error.code === 'P2025') {
-      return res.status(404).json({message: 'Payment not found'})
+    const { userId, items, totalAmount, status } = req.body;
+    if (!userId || !items || !Array.isArray(items) || items.length === 0 || !totalAmount || !status) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
+    const order = await prisma.order.create({
+      data: {
+        userId,
+        totalAmount,
+        status,
+        items: {
+          create: items.map((item: any) => ({
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            tourDepartureId: item.tourDepartureId
+          }))
+        }
+      },
+      include: {
+        items: true
+      }
+    });
+    res.status(201).json(order);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function createOrderItem(req: Request, res: Response) {
+  try {
+    const { orderId, quantity, unitPrice, tourDepartureId } = req.body;
+    if (!orderId || !quantity || !unitPrice || !tourDepartureId) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    const orderItem = await prisma.orderItem.create({
+      data: {
+        orderId,
+        quantity,
+        unitPrice,
+        tourDepartureId
+      }
+    });
+    res.status(201).json(orderItem);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
