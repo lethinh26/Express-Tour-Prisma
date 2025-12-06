@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { log } from 'console';
 
 export async function getPayments(req: Request, res: Response) {
   try {
@@ -250,6 +251,7 @@ export async function handleSepayIPN(req: Request, res: Response) {
       description            
     } = req.body;
 
+
     console.log('Transaction details:', {
       id,
       gateway,
@@ -269,10 +271,13 @@ export async function handleSepayIPN(req: Request, res: Response) {
 
     let paymentId: string | null = null;
 
-    // Cách 1: Tìm payment_id trong content (format: TOUR PAYMENT uuid hoặc TOUR-PAYMENT-uuid)
-    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9-]{36})/i);
+    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9-]{32,36})/i);
     if (contentMatch) {
-      paymentId = contentMatch[1];
+      let extractedId = contentMatch[1];
+      if (extractedId.length === 32) {
+        extractedId = `${extractedId.slice(0,8)}-${extractedId.slice(8,12)}-${extractedId.slice(12,16)}-${extractedId.slice(16,20)}-${extractedId.slice(20)}`;
+      }
+      paymentId = extractedId;
     }
 
     // Cách 2: Nếu code chứa payment_id
@@ -331,13 +336,17 @@ export async function handleSepayIPN(req: Request, res: Response) {
       });
     }
 
-    const contentUpper = content?.toUpperCase().trim();
-    const descriptionUpper = payment.description?.toUpperCase().trim();
+    // Verify content chứa payment description (bỏ qua dấu gạch ngang trong UUID)
+    const normalizeContent = (str: string) => str.toUpperCase().replace(/-/g, '').trim();
+    const contentNormalized = normalizeContent(content || '');
+    const descriptionNormalized = normalizeContent(payment.description || '');
     
-    if (contentUpper !== descriptionUpper) {
+    if (!contentNormalized.includes(descriptionNormalized)) {
       console.error('Content mismatch:', {
         expected: payment.description,
-        received: content
+        received: content,
+        normalized_expected: descriptionNormalized,
+        normalized_received: contentNormalized
       });
       // Vẫn trả success nhưng không cập nhật
       return res.json({ 
