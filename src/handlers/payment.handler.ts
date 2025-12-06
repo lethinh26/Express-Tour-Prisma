@@ -218,10 +218,22 @@ export async function handleSepayIPN(req: Request, res: Response) {
     }
 
     // SePay gửi "Authorization: Apikey YOUR_SECRET_KEY"
-    if (authHeader !== apiKey && authHeader !== `Apikey ${apiKey}`) {
-      console.error('Invalid API Key:', authHeader);
+    // Extract key từ format "Apikey KEY" hoặc chỉ "KEY"
+    let receivedKey = authHeader;
+    if (authHeader.startsWith('Apikey ')) {
+      receivedKey = authHeader.substring(7); // Remove "Apikey "
+    } else if (authHeader.startsWith('ApiKey ')) {
+      receivedKey = authHeader.substring(7); // Remove "ApiKey "
+    }
+    
+    if (receivedKey !== apiKey) {
+      console.error('Invalid API Key received:', authHeader);
+      console.error('Expected:', apiKey);
+      console.error('Got:', receivedKey);
       return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
     }
+    
+    console.log('✅ API Key verified successfully');
 
     const { 
       id,                   
