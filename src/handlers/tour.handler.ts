@@ -288,3 +288,39 @@ export async function deleteReview(req: Request, res: Response) {
         res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+export async function getUserReviewForTour(req: Request, res: Response) {
+    try {
+        const tourId = Number(req.params.tourId);
+        const userId = Number(req.params.userId);
+
+        if (isNaN(tourId) || isNaN(userId)) {
+            return res.status(400).json({ message: 'Invalid tour ID or user ID' });
+        }
+
+        const review = await prisma.review.findFirst({
+            where: {
+                tourId: tourId,
+                userId: userId
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!review) {
+            return res.json({ hasReviewed: false, review: null });
+        }
+
+        res.json({ hasReviewed: true, review: review });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
