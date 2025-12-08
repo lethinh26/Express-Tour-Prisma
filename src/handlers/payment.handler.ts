@@ -10,10 +10,27 @@ export async function getPayments(req: Request, res: Response) {
         user: true,
         order: {
           include: {
-            items: true,
+            items: {
+              include: {
+                departure: {
+                  include: {
+                    tour: {
+                      include: {
+                        location: true,
+                        category: true,
+                        images: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
 
     res.json(payments);
@@ -58,6 +75,39 @@ export async function getPaymentById(req: Request, res: Response) {
     }
 
     res.json(payment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function getOrders(req: Request, res: Response) {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        user: true,
+        items: {
+          include: {
+            departure: {
+              include: {
+                tour: {
+                  include: {
+                    location: true,
+                    category: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        payments: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(orders);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -130,7 +180,6 @@ export async function updatePayment(req: Request, res: Response) {
       return res.status(400).json({message: 'At least one field is required to update'})
     }
 
-    // Lấy payment hiện tại để check orderId
     const currentPayment = await prisma.payment.findUnique({
       where: { id }
     });
@@ -144,7 +193,6 @@ export async function updatePayment(req: Request, res: Response) {
       data: updateData
     });
 
-    // Nếu payment status được update thành SUCCESS, cập nhật order thành PAID
     if (updateData.status === PaymentStatus.SUCCESS && currentPayment.orderId) {
       await prisma.order.update({
         where: { id: currentPayment.orderId },
