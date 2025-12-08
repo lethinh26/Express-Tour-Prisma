@@ -11,6 +11,7 @@ export async function getOrdersByDeparture(req: Request, res: Response) {
 
         const orders = await prisma.order.findMany({
             where: {
+                status: 'PAID',
                 items: {
                     some: {
                         tourDepartureId: departureId

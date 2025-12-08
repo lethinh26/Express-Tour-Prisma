@@ -196,13 +196,30 @@ export async function updatePayment(req: Request, res: Response) {
     });
 
     if (updateData.status === PaymentStatus.SUCCESS && currentPayment.orderId) {
-      await prisma.order.update({
+      // Update order status to PAID
+      const order = await prisma.order.update({
         where: { id: currentPayment.orderId },
         data: {
           status: OrderStatus.PAID
+        },
+        include: {
+          items: true
         }
       });
-      console.log('Order updated to PAID:', currentPayment.orderId);
+      
+      // Decrease available seats for each order item
+      for (const item of order.items) {
+        await prisma.tourDeparture.update({
+          where: { id: item.tourDepartureId },
+          data: {
+            availableSeats: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+      
+      console.log('Order updated to PAID and seats decreased:', currentPayment.orderId);
     }
 
     res.json(payment);
@@ -428,13 +445,30 @@ export async function handleSepayIPN(req: Request, res: Response) {
     });
 
     if (payment.orderId) {
-      await prisma.order.update({
+      // Update order status to PAID
+      const order = await prisma.order.update({
         where: { id: payment.orderId },
         data: {
           status: OrderStatus.PAID
+        },
+        include: {
+          items: true
         }
       });
-      console.log('Order updated to PAID:', payment.orderId);
+      
+      // Decrease available seats for each order item
+      for (const item of order.items) {
+        await prisma.tourDeparture.update({
+          where: { id: item.tourDepartureId },
+          data: {
+            availableSeats: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+      
+      console.log('Order updated to PAID and seats decreased:', payment.orderId);
     }
 
     console.log('Payment updated successfully:', {
