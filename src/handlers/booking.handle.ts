@@ -123,6 +123,46 @@ export async function countAllBookingsSuccess(req: Request, res: Response) {
     }
 }
 
+export async function getMonthlyRevenueAll(req: Request, res: Response) {
+    try {
+        const month = Number(req.query.month);
+        const year = Number(req.query.year || new Date().getFullYear());
+
+        if (!month || month < 1 || month > 12) {
+            return res.status(400).json({ message: "Invalid month (1-12)" });
+        }
+
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59);
+
+        const payments = await prisma.payment.findMany({
+            where: {
+                status: "SUCCESS",
+                createdAt: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                amount: true,
+            },
+        });
+
+        const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+        const count = payments.length;
+
+        return res.status(200).json({
+            month,
+            year,
+            count,
+            totalRevenue,
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
 export async function getMonthlyRevenue(req: Request, res: Response) {
     try {
         const authHeader = req.headers.authorization;

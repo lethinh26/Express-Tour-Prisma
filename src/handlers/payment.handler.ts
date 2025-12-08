@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
-import { log } from 'console';
 
 export async function getPayments(req: Request, res: Response) {
   try {
