@@ -150,3 +150,141 @@ export async function countAllTours(req: Request, res: Response) {
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+export async function createReview(req: Request, res: Response) {
+    try {
+        const { tourId, userId, rating, comment } = req.body;
+
+        if (!tourId || !userId || !rating) {
+            return res.status(400).json({ message: 'Missing required fields: tourId, userId, rating' });
+        }
+
+        if (rating < 1 || rating > 10) {
+            return res.status(400).json({ message: 'Rating must be between 1 and 10' });
+        }
+
+        const review = await prisma.review.create({
+            data: {
+                tourId: Number(tourId),
+                userId: Number(userId),
+                rating: Number(rating),
+                comment: comment || null
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                },
+                tour: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
+            }
+        });
+
+        res.status(201).json(review);
+    } catch (error: any) {
+        console.error(error);
+        if (error.code === 'P2003') {
+            return res.status(404).json({ message: 'Tour or User not found' });
+        }
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+export async function getReviews(req: Request, res: Response) {
+    try {
+        const reviews = await prisma.review.findMany({
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                },
+                tour: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        res.json(reviews || []);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error', data: [] });
+    }
+}
+
+export async function getReviewsByTourId(req: Request, res: Response) {
+    try {
+        const tourId = Number(req.params.tourId);
+
+        if (isNaN(tourId)) {
+            return res.status(400).json({ message: 'Invalid tour ID' });
+        }
+
+        const reviews = await prisma.review.findMany({
+            where: {
+                tourId: tourId
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+        const averageRating = reviews.length > 0 ? totalRating / reviews.length : 0;
+
+        res.json({
+            reviews: reviews || [],
+            totalReviews: reviews.length,
+            averageRating: averageRating
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error', data: [] });
+    }
+}
+
+export async function deleteReview(req: Request, res: Response) {
+    try {
+        const id = Number(req.params.id);
+
+        if (isNaN(id)) {
+            return res.status(400).json({ message: 'Invalid review ID' });
+        }
+
+        await prisma.review.delete({
+            where: { id }
+        });
+
+        res.json({ message: 'Review deleted successfully' });
+    } catch (error: any) {
+        console.error(error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Review not found' });
+        }
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}

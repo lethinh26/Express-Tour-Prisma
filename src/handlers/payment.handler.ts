@@ -91,8 +91,11 @@ export async function getOrders(req: Request, res: Response) {
             departure: {
               include: {
                 tour: {
-                  include: {
-                    location: true,
+                  select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    information: true,
                     category: true
                   }
                 }
