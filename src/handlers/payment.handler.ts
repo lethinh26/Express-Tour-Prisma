@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
 import { log } from 'console';
 
 export async function getPayments(req: Request, res: Response) {
@@ -130,10 +130,30 @@ export async function updatePayment(req: Request, res: Response) {
       return res.status(400).json({message: 'At least one field is required to update'})
     }
 
+    // Lấy payment hiện tại để check orderId
+    const currentPayment = await prisma.payment.findUnique({
+      where: { id }
+    });
+
+    if (!currentPayment) {
+      return res.status(404).json({message: 'Payment not found'})
+    }
+
     const payment = await prisma.payment.update({
       where: { id },
       data: updateData
     });
+
+    // Nếu payment status được update thành SUCCESS, cập nhật order thành PAID
+    if (updateData.status === PaymentStatus.SUCCESS && currentPayment.orderId) {
+      await prisma.order.update({
+        where: { id: currentPayment.orderId },
+        data: {
+          status: OrderStatus.PAID
+        }
+      });
+      console.log('Order updated to PAID:', currentPayment.orderId);
+    }
 
     res.json(payment);
 
@@ -197,14 +217,11 @@ export async function createOrderItem(req: Request, res: Response) {
   }
 }
 
-// IPN Handler for SePay payment notifications
 export async function handleSepayIPN(req: Request, res: Response) {
   try {
-    console.log('=== SePay IPN Received ===');
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
     
-    // Verify API Key từ header Authorization
     const authHeader = req.headers.authorization;
     const apiKey = process.env.SEPAY_SECRET_KEY;
 
@@ -213,18 +230,12 @@ export async function handleSepayIPN(req: Request, res: Response) {
       return res.status(401).json({ error: 'Unauthorized: Missing Authorization header' });
     }
 
-    if (!apiKey) {
-      console.error('SEPAY_SECRET_KEY not configured in .env');
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
-
-    // SePay gửi "Authorization: Apikey YOUR_SECRET_KEY"
-    // Extract key từ format "Apikey KEY" hoặc chỉ "KEY"
     let receivedKey = authHeader;
+    
     if (authHeader.startsWith('Apikey ')) {
-      receivedKey = authHeader.substring(7); // Remove "Apikey "
+      receivedKey = authHeader.substring(7); 
     } else if (authHeader.startsWith('ApiKey ')) {
-      receivedKey = authHeader.substring(7); // Remove "ApiKey "
+      receivedKey = authHeader.substring(7); 
     }
     
     if (receivedKey !== apiKey) {
@@ -234,7 +245,7 @@ export async function handleSepayIPN(req: Request, res: Response) {
       return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
     }
     
-    console.log('✅ API Key verified successfully');
+    console.log('API Key verified successfully');
 
     const { 
       id,                   
@@ -252,17 +263,8 @@ export async function handleSepayIPN(req: Request, res: Response) {
     } = req.body;
 
 
-    console.log('Transaction details:', {
-      id,
-      gateway,
-      transferAmount,
-      content,
-      transferType,
-      transactionDate
-    });
 
     if (transferType !== 'in') {
-      console.log('Skipping outbound transaction');
       return res.json({ 
         success: true, 
         message: 'Outbound transaction ignored' 
@@ -271,11 +273,9 @@ export async function handleSepayIPN(req: Request, res: Response) {
 
     let paymentId: string | null = null;
 
-    // Tìm UUID format: 8-4-4-4-12 hoặc 32 ký tự hex liên tiếp
     const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/i);
     if (contentMatch) {
       let extractedId = contentMatch[1];
-      // Nếu không có dấu gạch ngang (32 ký tự), thêm vào đúng format UUID
       if (extractedId.length === 32) {
         extractedId = `${extractedId.slice(0,8)}-${extractedId.slice(8,12)}-${extractedId.slice(12,16)}-${extractedId.slice(16,20)}-${extractedId.slice(20)}`;
       }
@@ -283,12 +283,10 @@ export async function handleSepayIPN(req: Request, res: Response) {
       console.log('Extracted payment ID:', paymentId);
     }
 
-    // Cách 2: Nếu code chứa payment_id
     if (!paymentId && code) {
       paymentId = code;
     }
 
-    // Cách 3: Tìm payment theo số tiền và status PENDING (fallback)
     if (!paymentId) {
       console.log('Payment ID not found in content/code, searching by amount...');
       const pendingPayment = await prisma.payment.findFirst({
@@ -339,7 +337,6 @@ export async function handleSepayIPN(req: Request, res: Response) {
       });
     }
 
-    // Verify content chứa payment description (bỏ qua dấu gạch ngang trong UUID)
     const normalizeContent = (str: string) => str.toUpperCase().replace(/-/g, '').trim();
     const contentNormalized = normalizeContent(content || '');
     const descriptionNormalized = normalizeContent(payment.description || '');
@@ -351,7 +348,6 @@ export async function handleSepayIPN(req: Request, res: Response) {
         normalized_expected: descriptionNormalized,
         normalized_received: contentNormalized
       });
-      // Vẫn trả success nhưng không cập nhật
       return res.json({ 
         success: true, 
         message: 'Content mismatch, payment not updated',
@@ -360,13 +356,11 @@ export async function handleSepayIPN(req: Request, res: Response) {
       });
     }
 
-    // Kiểm tra số tiền khớp
     if (Number(payment.amount) !== transferAmount) {
       console.error('Amount mismatch:', {
         expected: payment.amount,
         received: transferAmount
       });
-      // Vẫn trả success nhưng không cập nhật
       return res.json({ 
         success: true, 
         message: 'Amount mismatch, payment not updated',
@@ -375,15 +369,23 @@ export async function handleSepayIPN(req: Request, res: Response) {
       });
     }
 
-    // Cập nhật payment status thành SUCCESS
     const updatedPayment = await prisma.payment.update({
       where: { id: paymentId },
       data: {
         status: PaymentStatus.SUCCESS,
         method: PaymentMethod.BANK_TRANSFER,
-        // Có thể lưu thêm thông tin giao dịch vào note/metadata nếu cần
       }
     });
+
+    if (payment.orderId) {
+      await prisma.order.update({
+        where: { id: payment.orderId },
+        data: {
+          status: OrderStatus.PAID
+        }
+      });
+      console.log('Order updated to PAID:', payment.orderId);
+    }
 
     console.log('Payment updated successfully:', {
       payment_id: paymentId,
@@ -393,7 +395,6 @@ export async function handleSepayIPN(req: Request, res: Response) {
       status: 'SUCCESS'
     });
 
-    // Trả về success để SePay biết đã nhận và xử lý
     return res.json({ 
       success: true, 
       message: 'IPN processed successfully',
@@ -404,7 +405,6 @@ export async function handleSepayIPN(req: Request, res: Response) {
 
   } catch (err) {
     console.error('SePay IPN Error:', err);
-    // Vẫn trả về 200 để SePay không retry liên tục
     res.status(200).json({ 
       success: false, 
       error: 'Internal server error' 

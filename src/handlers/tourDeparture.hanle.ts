@@ -5,10 +5,10 @@ export async function getTourDeparture(req: Request, res: Response) {
     try {
         const tourDeparture = await prisma.tourDeparture.findMany({});
 
-        res.json(tourDeparture);
+        res.json(tourDeparture || []);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: "Internal server error", data: [] });
     }
 }
 

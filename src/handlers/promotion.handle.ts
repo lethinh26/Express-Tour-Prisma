@@ -319,10 +319,10 @@ export async function getPromotion(req: Request, res: Response) {
       },
     });
 
-    return res.json(promotions);
+    return res.json(promotions || []);
   } catch (err) {
     console.error("getPromotion error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error", data: [] });
   }
 }
 

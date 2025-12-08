@@ -5,10 +5,10 @@ const jwt = require('jsonwebtoken');
 export async function getTours(req: Request, res: Response) {
     try {
         const tours = await prisma.tour.findMany();
-        res.json(tours);
+        res.json(tours || []);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error', data: [] });
     }
 }
 
