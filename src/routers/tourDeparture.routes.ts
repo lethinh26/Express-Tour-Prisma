@@ -5,7 +5,7 @@ import { createTourDeparture, deleteTourDeparture, getTourDeparture, getTourDepa
 const router = Router();
 
 router.get('/', getTourDeparture);
-router.get('/:id', getTourDepartureByTourId); 
+router.get('/tour/:id', getTourDepartureByTourId); 
 router.post('/', createTourDeparture);
 router.patch('/:id', updateTourDeparture);
 router.delete('/:id', deleteTourDeparture);

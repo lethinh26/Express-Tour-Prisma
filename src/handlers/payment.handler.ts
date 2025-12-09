@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
-import crypto from 'crypto';
+import { PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
 
 export async function getPayments(req: Request, res: Response) {
   try {
@@ -10,10 +9,27 @@ export async function getPayments(req: Request, res: Response) {
         user: true,
         order: {
           include: {
-            items: true,
+            items: {
+              include: {
+                departure: {
+                  include: {
+                    tour: {
+                      include: {
+                        location: true,
+                        category: true,
+                        images: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
 
     res.json(payments);
@@ -64,6 +80,42 @@ export async function getPaymentById(req: Request, res: Response) {
   }
 }
 
+export async function getOrders(req: Request, res: Response) {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        user: true,
+        items: {
+          include: {
+            departure: {
+              include: {
+                tour: {
+                  select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    information: true,
+                    category: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        payments: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 export async function createPayment(req: Request, res: Response) {
   try {
     const { orderId, userId, amount, method, status } = req.body;
@@ -87,10 +139,18 @@ export async function createPayment(req: Request, res: Response) {
         amount,
         method,
         status,
+        description: '', 
       },
     });
 
-    res.status(201).json(payment);
+    const description = `TOUR PAYMENT ${payment.id}`;
+    
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: { description }
+    });
+
+    res.status(201).json(updatedPayment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -100,10 +160,11 @@ export async function createPayment(req: Request, res: Response) {
 export async function updatePayment(req: Request, res: Response) {
   try {
     const id: string = req.params.id;
-    const { amount, method, status } = req.body;
+    const { amount, method, status, description } = req.body;
 
     const updateData: any = {}
     if (amount !== undefined) updateData.amount = amount
+    if (description !== undefined) updateData.description = description
     if (method) {
       if (!Object.values(PaymentMethod).includes(method)) {
         return res.status(400).json({ message: 'Invalid payment method' });
@@ -121,10 +182,45 @@ export async function updatePayment(req: Request, res: Response) {
       return res.status(400).json({message: 'At least one field is required to update'})
     }
 
+    const currentPayment = await prisma.payment.findUnique({
+      where: { id }
+    });
+
+    if (!currentPayment) {
+      return res.status(404).json({message: 'Payment not found'})
+    }
+
     const payment = await prisma.payment.update({
       where: { id },
       data: updateData
     });
+
+    if (updateData.status === PaymentStatus.SUCCESS && currentPayment.orderId) {
+      // Update order status to PAID
+      const order = await prisma.order.update({
+        where: { id: currentPayment.orderId },
+        data: {
+          status: OrderStatus.PAID
+        },
+        include: {
+          items: true
+        }
+      });
+      
+      // Decrease available seats for each order item
+      for (const item of order.items) {
+        await prisma.tourDeparture.update({
+          where: { id: item.tourDepartureId },
+          data: {
+            availableSeats: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+      
+      console.log('Order updated to PAID and seats decreased:', currentPayment.orderId);
+    }
 
     res.json(payment);
 
@@ -188,109 +284,211 @@ export async function createOrderItem(req: Request, res: Response) {
   }
 }
 
-function verifySepaySignature(data: any, receivedSignature: string): boolean {
-  try {
-    const secretKey = process.env.SEPAY_SECRET_KEY || process.env.SECRET_KEY;
-    
-    if (!secretKey) {
-      console.error('SEPAY_SECRET_KEY not configured');
-      return false;
-    }
-
-    const signString = `${data.transaction_id}${data.payment_id}${data.amount}${data.status}`;
-    
-    const expectedSignature = crypto
-      .createHmac('sha256', secretKey)
-      .update(signString)
-      .digest('hex');
-    
-    console.log('Signature verification:', {
-      received: receivedSignature,
-      expected: expectedSignature,
-      match: expectedSignature === receivedSignature
-    });
-
-    return expectedSignature === receivedSignature;
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-}
-
 export async function handleSepayIPN(req: Request, res: Response) {
   try {
-    console.log('SePay IPN received:', req.body);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
     
+    const authHeader = req.headers.authorization;
+    const apiKey = process.env.SEPAY_SECRET_KEY;
+
+    if (!authHeader) {
+      console.error('Missing Authorization header');
+      return res.status(401).json({ error: 'Unauthorized: Missing Authorization header' });
+    }
+
+    let receivedKey = authHeader;
+    
+    if (authHeader.startsWith('Apikey ')) {
+      receivedKey = authHeader.substring(7); 
+    } else if (authHeader.startsWith('ApiKey ')) {
+      receivedKey = authHeader.substring(7); 
+    }
+    
+    if (receivedKey !== apiKey) {
+      console.error('Invalid API Key received:', authHeader);
+      console.error('Expected:', apiKey);
+      console.error('Got:', receivedKey);
+      return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+    }
+    
+    console.log('API Key verified successfully');
+
     const { 
-      transaction_id,
-      payment_id,
-      amount,
-      status,
-      signature
+      id,                   
+      gateway,               
+      transactionDate,
+      accountNumber,
+      code,
+      content,
+      transferType,
+      transferAmount,
+      accumulated,           
+      subAccount,            
+      referenceCode,         
+      description            
     } = req.body;
 
-    if (!signature) {
-      console.error('Missing signature in IPN request');
-      return res.status(400).json({ error: 'Missing signature' });
-    }
 
-    const isValidSignature = verifySepaySignature(req.body, signature);
-    if (!isValidSignature) {
-      console.error('Invalid signature from SePay');
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
 
-    if (!payment_id) {
-      return res.status(400).json({ error: 'Missing payment_id' });
-    }
-
-    const payment = await prisma.payment.findUnique({
-      where: { id: payment_id }
-    });
-
-    if (!payment) {
-      console.error('Payment not found:', payment_id);
-      return res.status(404).json({ error: 'Payment not found' });
-    }
-
-    if (payment.status === 'SUCCESS') {
-      console.log('Payment already processed:', payment_id);
+    if (transferType !== 'in') {
       return res.json({ 
         success: true, 
-        message: 'Payment already processed' 
+        message: 'Outbound transaction ignored' 
       });
     }
 
-    let newStatus: PaymentStatus;
+    let paymentId: string | null = null;
+
+    const contentMatch = content?.match(/TOUR[ -]PAYMENT[ -]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/i);
+    if (contentMatch) {
+      let extractedId = contentMatch[1];
+      if (extractedId.length === 32) {
+        extractedId = `${extractedId.slice(0,8)}-${extractedId.slice(8,12)}-${extractedId.slice(12,16)}-${extractedId.slice(16,20)}-${extractedId.slice(20)}`;
+      }
+      paymentId = extractedId;
+      console.log('Extracted payment ID:', paymentId);
+    }
+
+    if (!paymentId && code) {
+      paymentId = code;
+    }
+
+    if (!paymentId) {
+      console.log('Payment ID not found in content/code, searching by amount...');
+      const pendingPayment = await prisma.payment.findFirst({
+        where: {
+          amount: transferAmount,
+          status: PaymentStatus.PENDING
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (pendingPayment) {
+        paymentId = pendingPayment.id;
+        console.log('Found pending payment by amount:', paymentId);
+      }
+    }
+
+    if (!paymentId) {
+      console.error('Payment ID not found in transaction content or code');
+      return res.json({ 
+        success: true, 
+        message: 'Payment ID not found, transaction logged',
+        transaction_id: id
+      });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId }
+    });
+
+    if (!payment) {
+      console.error('Payment not found in database:', paymentId);
+      return res.json({ 
+        success: true, 
+        message: 'Payment not found in database',
+        transaction_id: id
+      });
+    }
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      console.log('Payment already processed:', paymentId);
+      return res.json({ 
+        success: true, 
+        message: 'Payment already processed',
+        payment_id: paymentId,
+        transaction_id: id
+      });
+    }
+
+    const normalizeContent = (str: string) => str.toUpperCase().replace(/-/g, '').trim();
+    const contentNormalized = normalizeContent(content || '');
+    const descriptionNormalized = normalizeContent(payment.description || '');
     
-    if (status === 'SUCCESS') {
-      newStatus = PaymentStatus.SUCCESS;
-    } else if (status === 'FAILED') {
-      newStatus = PaymentStatus.FAILED;
-    } else {
-      newStatus = PaymentStatus.PENDING;
+    if (!contentNormalized.includes(descriptionNormalized)) {
+      console.error('Content mismatch:', {
+        expected: payment.description,
+        received: content,
+        normalized_expected: descriptionNormalized,
+        normalized_received: contentNormalized
+      });
+      return res.json({ 
+        success: true, 
+        message: 'Content mismatch, payment not updated',
+        payment_id: paymentId,
+        transaction_id: id
+      });
+    }
+
+    if (Number(payment.amount) !== transferAmount) {
+      console.error('Amount mismatch:', {
+        expected: payment.amount,
+        received: transferAmount
+      });
+      return res.json({ 
+        success: true, 
+        message: 'Amount mismatch, payment not updated',
+        payment_id: paymentId,
+        transaction_id: id
+      });
     }
 
     const updatedPayment = await prisma.payment.update({
-      where: { id: payment_id },
+      where: { id: paymentId },
       data: {
-        status: newStatus,
+        status: PaymentStatus.SUCCESS,
         method: PaymentMethod.BANK_TRANSFER,
       }
     });
 
-    console.log('Payment updated:', updatedPayment);
+    if (payment.orderId) {
+      // Update order status to PAID
+      const order = await prisma.order.update({
+        where: { id: payment.orderId },
+        data: {
+          status: OrderStatus.PAID
+        },
+        include: {
+          items: true
+        }
+      });
+      
+      // Decrease available seats for each order item
+      for (const item of order.items) {
+        await prisma.tourDeparture.update({
+          where: { id: item.tourDepartureId },
+          data: {
+            availableSeats: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+      
+      console.log('Order updated to PAID and seats decreased:', payment.orderId);
+    }
+
+    console.log('Payment updated successfully:', {
+      payment_id: paymentId,
+      transaction_id: id,
+      amount: transferAmount,
+      gateway,
+      status: 'SUCCESS'
+    });
 
     return res.json({ 
       success: true, 
       message: 'IPN processed successfully',
-      payment_id: payment_id,
-      status: newStatus
+      payment_id: paymentId,
+      transaction_id: id,
+      status: 'SUCCESS'
     });
 
   } catch (err) {
     console.error('SePay IPN Error:', err);
-    // 200 để SePay không retry liên tục
     res.status(200).json({ 
       success: false, 
       error: 'Internal server error' 

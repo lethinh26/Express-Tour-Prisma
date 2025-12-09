@@ -5,10 +5,10 @@ export async function getTourDeparture(req: Request, res: Response) {
     try {
         const tourDeparture = await prisma.tourDeparture.findMany({});
 
-        res.json(tourDeparture);
+        res.json(tourDeparture || []);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: "Internal server error", data: [] });
     }
 }
 
@@ -61,11 +61,11 @@ export async function updateTourDeparture(req: Request, res: Response) {
         const { departure, price, capacity, availableSeats, tourId } = req.body;
         
         const updateData: any = {}
-        if (departure) updateData.departure = departure
-        if (price) updateData.price = price
-        if (capacity !== undefined) updateData.capacity = capacity
-        if (availableSeats !== undefined) updateData.availableSeats = availableSeats
-        if (tourId) updateData.tourId = tourId
+        if (departure !== undefined) updateData.departure = new Date(departure)
+        if (price !== undefined) updateData.price = Number(price)
+        if (capacity !== undefined) updateData.capacity = Number(capacity)
+        if (availableSeats !== undefined) updateData.availableSeats = Number(availableSeats)
+        if (tourId !== undefined) updateData.tourId = Number(tourId)
 
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({message: 'At least one field is required to update'})

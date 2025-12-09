@@ -5,10 +5,10 @@ export async function getCategory(req: Request, res: Response) {
     try {
         const category = await prisma.category.findMany({})
         
-        res.json(category)
+        res.json(category || [])
     } catch (error) {
         console.error(error);
-        res.status(500).json({error: 'Internal server error'})
+        res.status(500).json({error: 'Internal server error', data: []})
     }
 }
 

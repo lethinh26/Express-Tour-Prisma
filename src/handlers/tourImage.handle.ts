@@ -9,10 +9,10 @@ export async function getAllImage(req: Request, res: Response) {
                 { position: 'asc' }
             ]
         });
-        res.json(tourImages)
+        res.json(tourImages || [])
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error'})
+        res.status(500).json({ message: 'Internal server error', data: []})
     }
 }
 

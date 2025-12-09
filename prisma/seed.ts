@@ -11,12 +11,14 @@ async function main() {
             id: 1,
             name: "admin",
             email: "admin@gmail.com",
+            phoneNumber: "0123456789",
             passwordHash: "123456789",
             role: Role.ADMIN,
           },
           {
             name: "tourist",
             email: "tourist@gmail.com",
+            phoneNumber: "0987654321",
             passwordHash: "123456",
             role: Role.TOUR_MANAGER,
           }
@@ -1045,6 +1047,23 @@ async function main() {
             { userId: 2, promotionId: 2 },
         ],
         skipDuplicates: true, 
+    });
+
+    await prisma.order.create({
+        data: {
+            userId: 1,
+            status: OrderStatus.PENDING,
+            totalAmount: 2000,
+            items: {
+                create: [
+                    {
+                        quantity: 1,
+                        unitPrice: 2000,
+                        tourDepartureId: 1
+                    }
+                ]
+            }
+        }
     });
 
     console.log("DONE");
