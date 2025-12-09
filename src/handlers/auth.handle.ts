@@ -5,8 +5,8 @@ import jwt from "jsonwebtoken";
 
 export async function createAccount(req: Request, res: Response) {
     try {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password ) {
+        const { name, email, password, phoneNumber } = req.body;
+        if (!name || !email || !password || !phoneNumber) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
@@ -15,6 +15,7 @@ export async function createAccount(req: Request, res: Response) {
             data: {
                 name,
                 email,
+                phoneNumber,
                 passwordHash: hasedPass,
                 role: "USER",
                 createdAt: new Date(),

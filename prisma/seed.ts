@@ -11,12 +11,14 @@ async function main() {
             id: 1,
             name: "admin",
             email: "admin@gmail.com",
+            phoneNumber: "0123456789",
             passwordHash: "123456789",
             role: Role.ADMIN,
           },
           {
             name: "tourist",
             email: "tourist@gmail.com",
+            phoneNumber: "0987654321",
             passwordHash: "123456",
             role: Role.TOUR_MANAGER,
           }
@@ -1049,9 +1051,9 @@ async function main() {
 
     await prisma.order.create({
         data: {
-            id: 1,
             userId: 1,
             status: OrderStatus.PENDING,
+            totalAmount: 2000,
             items: {
                 create: [
                     {

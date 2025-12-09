@@ -24,6 +24,7 @@ export async function getOrdersByDeparture(req: Request, res: Response) {
                         id: true,
                         name: true,
                         email: true,
+                        phoneNumber: true,
                     }
                 },
                 items: {
@@ -65,6 +66,7 @@ export async function getAllOrders(req: Request, res: Response) {
                         id: true,
                         name: true,
                         email: true,
+                        phoneNumber: true,
                     }
                 },
                 items: {
