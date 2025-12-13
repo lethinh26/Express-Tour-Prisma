@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../utils/prisma";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
+import { sendWelcomeEmail } from "../utils/email";
 
 export async function createAccount(req: Request, res: Response) {
     try {
@@ -23,6 +24,11 @@ export async function createAccount(req: Request, res: Response) {
         });
         const {passwordHash, ...acc} = account 
         const token = jwt.sign({ id: account.id }, process.env.SECRET_KEY, { expiresIn: "24h" });
+
+        // Send welcome email (non-blocking)
+        sendWelcomeEmail(account.email, account.name).catch(err => {
+            console.error('Failed to send welcome email:', err);
+        });
 
         return res.status(201).json({ account: acc, token });
     } catch (error: any) {
@@ -144,6 +150,42 @@ export async function changePassword(req: Request, res: Response) {
 
     } catch (error: any) {
         console.log("Change Password Error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export async function deleteAccount(req: Request, res: Response) {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: "Missing token" });
+        }
+
+        let decoded: any;
+        try {
+            decoded = jwt.verify(token, process.env.SECRET_KEY as string);
+        } catch (err) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Delete user account
+        await prisma.user.delete({
+            where: { id: user.id },
+        });
+
+        return res.status(200).json({ message: "Account deleted successfully" });
+
+    } catch (error: any) {
+        console.log("Delete Account Error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }
