@@ -1,29 +1,12 @@
-import * as SibApiV3Sdk from 'sib-api-v3-sdk';
+const SibApiV3Sdk = require("sib-api-v3-sdk");
 
-const defaultClient = SibApiV3Sdk.ApiClient.instance;
-const apiKey = defaultClient.authentications['api-key'];
-apiKey.apiKey = process.env.MAIL_API_KEY;
+const client = SibApiV3Sdk.ApiClient.instance;
+client.authentications["api-key"].apiKey = process.env.MAIL_API_KEY;
 
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+const api = new SibApiV3Sdk.TransactionalEmailsApi();
 
 export async function sendWelcomeEmail(toEmail: string, toName: string) {
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-
-    sendSmtpEmail.sender = {
-        email: 'account@latedev.com',
-        name: 'Triploka'
-    };
-
-    sendSmtpEmail.to = [
-        {
-            email: toEmail,
-            name: toName
-        }
-    ];
-
-    sendSmtpEmail.subject = 'Chào mừng đến với Triploka!';
-    
-    sendSmtpEmail.htmlContent = `
+    const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -109,7 +92,18 @@ export async function sendWelcomeEmail(toEmail: string, toName: string) {
     `;
 
     try {
-        const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+        const data = await api.sendTransacEmail({
+            sender: { 
+                email: 'account@latedev.com',
+                name: 'Triploka'
+            },
+            to: [{ 
+                email: toEmail,
+                name: toName
+            }],
+            subject: 'Chào mừng đến với Triploka!',
+            htmlContent: htmlContent,
+        });
         console.log('success:', data);
         return { success: true, data };
     } catch (error) {
