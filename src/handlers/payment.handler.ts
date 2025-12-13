@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
+import { sendPaymentRequestEmail, sendPaymentSuccessEmail } from '../utils/email';
 
 export async function getPayments(req: Request, res: Response) {
   try {
@@ -147,8 +148,46 @@ export async function createPayment(req: Request, res: Response) {
     
     const updatedPayment = await prisma.payment.update({
       where: { id: payment.id },
-      data: { description }
+      data: { description },
+      include: {
+        user: true,
+        order: {
+          include: {
+            items: {
+              include: {
+                departure: {
+                  include: {
+                    tour: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
+
+    if (updatedPayment.user && updatedPayment.order) {
+      const order = updatedPayment.order;
+      const firstItem = order.items[0];
+      const tourName = firstItem?.departure?.tour?.name || 'Tour';
+      const departureDate = firstItem?.departure?.departureDate 
+        ? new Date(firstItem.departure.departureDate).toLocaleDateString('vi-VN')
+        : 'N/A';
+      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+      sendPaymentRequestEmail(
+        updatedPayment.user.email,
+        updatedPayment.user.name,
+        {
+          code: order.code,
+          tourName,
+          departureDate,
+          quantity: totalQuantity,
+          totalAmount: updatedPayment.amount
+        }
+      ).catch(err => console.error('Failed to send payment request email:', err));
+    }
 
     res.status(201).json(updatedPayment);
   } catch (err) {
@@ -203,11 +242,19 @@ export async function updatePayment(req: Request, res: Response) {
           status: OrderStatus.PAID
         },
         include: {
-          items: true
+          items: {
+            include: {
+              departure: {
+                include: {
+                  tour: true
+                }
+              }
+            }
+          },
+          user: true
         }
       });
       
-      // Decrease available seats for each order item
       for (const item of order.items) {
         await prisma.tourDeparture.update({
           where: { id: item.tourDepartureId },
@@ -220,6 +267,27 @@ export async function updatePayment(req: Request, res: Response) {
       }
       
       console.log('Order updated to PAID and seats decreased:', currentPayment.orderId);
+
+      if (order.user) {
+        const firstItem = order.items[0];
+        const tourName = firstItem?.departure?.tour?.name || 'Tour';
+        const departureDate = firstItem?.departure?.departureDate 
+          ? new Date(firstItem.departure.departureDate).toLocaleDateString('vi-VN')
+          : 'N/A';
+        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+        sendPaymentSuccessEmail(
+          order.user.email,
+          order.user.name,
+          {
+            code: order.code,
+            tourName,
+            departureDate,
+            quantity: totalQuantity,
+            totalAmount: payment.amount
+          }
+        ).catch(err => console.error('Failed to send payment success email:', err));
+      }
     }
 
     res.json(payment);
@@ -445,18 +513,25 @@ export async function handleSepayIPN(req: Request, res: Response) {
     });
 
     if (payment.orderId) {
-      // Update order status to PAID
       const order = await prisma.order.update({
         where: { id: payment.orderId },
         data: {
           status: OrderStatus.PAID
         },
         include: {
-          items: true
+          items: {
+            include: {
+              departure: {
+                include: {
+                  tour: true
+                }
+              }
+            }
+          },
+          user: true
         }
       });
       
-      // Decrease available seats for each order item
       for (const item of order.items) {
         await prisma.tourDeparture.update({
           where: { id: item.tourDepartureId },
@@ -469,6 +544,27 @@ export async function handleSepayIPN(req: Request, res: Response) {
       }
       
       console.log('Order updated to PAID and seats decreased:', payment.orderId);
+
+      if (order.user) {
+        const firstItem = order.items[0];
+        const tourName = firstItem?.departure?.tour?.name || 'Tour';
+        const departureDate = firstItem?.departure?.departureDate 
+          ? new Date(firstItem.departure.departureDate).toLocaleDateString('vi-VN')
+          : 'N/A';
+        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+        sendPaymentSuccessEmail(
+          order.user.email,
+          order.user.name,
+          {
+            code: order.code,
+            tourName,
+            departureDate,
+            quantity: totalQuantity,
+            totalAmount: updatedPayment.amount
+          }
+        ).catch(err => console.error('Failed to send payment success email:', err));
+      }
     }
 
     console.log('Payment updated successfully:', {
