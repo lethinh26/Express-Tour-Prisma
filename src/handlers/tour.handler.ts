@@ -174,20 +174,46 @@ export async function countAllTours(req: Request, res: Response) {
 
 export async function createReview(req: Request, res: Response) {
     try {
-        const { tourId, userId, rating, comment } = req.body;
+        const { tourId, userId, rating, comment, orderId } = req.body;
 
-        if (!tourId || !userId || !rating) {
-            return res.status(400).json({ message: 'Missing required fields: tourId, userId, rating' });
+        if (!tourId || !userId || !rating || !orderId) {
+            return res.status(400).json({ message: 'Missing required fields: tourId, userId, rating, orderId' });
         }
 
         if (rating < 1 || rating > 10) {
             return res.status(400).json({ message: 'Rating must be between 1 and 10' });
         }
 
+        const order = await prisma.order.findFirst({
+            where: {
+                id: Number(orderId),
+                userId: Number(userId),
+                status: 'PAID'
+            }
+        });
+
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found or not paid' });
+        }
+
+        const existingReview = await prisma.review.findUnique({
+            where: {
+                orderId_userId: {
+                    orderId: Number(orderId),
+                    userId: Number(userId)
+                }
+            }
+        });
+
+        if (existingReview) {
+            return res.status(400).json({ message: 'You have already reviewed this order' });
+        }
+
         const review = await prisma.review.create({
             data: {
                 tourId: Number(tourId),
                 userId: Number(userId),
+                orderId: Number(orderId),
                 rating: Number(rating),
                 comment: comment || null
             },
@@ -323,6 +349,44 @@ export async function getUserReviewForTour(req: Request, res: Response) {
             where: {
                 tourId: tourId,
                 userId: userId
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!review) {
+            return res.json({ hasReviewed: false, review: null });
+        }
+
+        res.json({ hasReviewed: true, review: review });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getOrderReview(req: Request, res: Response) {
+    try {
+        const orderId = Number(req.params.orderId);
+        const userId = Number(req.params.userId);
+
+        if (isNaN(orderId) || isNaN(userId)) {
+            return res.status(400).json({ message: 'Invalid order ID or user ID' });
+        }
+
+        const review = await prisma.review.findUnique({
+            where: {
+                orderId_userId: {
+                    orderId: orderId,
+                    userId: userId
+                }
             },
             include: {
                 user: {

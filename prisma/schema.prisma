@@ -125,6 +125,7 @@ model Order {
 
   items       OrderItem[]
   payments    Payment[]
+  reviews     Review[]
 
 }
 
@@ -167,6 +168,11 @@ model Review {
 
   userId    Int
   user      User       @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  orderId   Int
+  order     Order      @relation(fields: [orderId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@unique([orderId, userId])
 }
 
 model Promotion {

@@ -1,17 +1,17 @@
 import { Router } from 'express';
-import { createPromotion, createPromotionUser, deletePromotionById, getPromotion, getPromotionByToken, getPromotionByUserId, updatePromotion } from '../handlers/promotion.handle';
+import { checkPromotionUsable, createPromotion, createPromotionUser, deletePromotionById, getPromotion, getPromotionByToken, updatePromotion, usePromotion } from '../handlers/promotion.handle';
 
 
 
 const router = Router();
 
 router.get('/', getPromotion)
-router.get('/:userId', getPromotionByUserId)
+router.post('/check-usable', checkPromotionUsable)
+router.post('/use', usePromotion)
+router.post('/token', createPromotionUser)
+router.get('/token/:token', getPromotionByToken)
 router.post('/', createPromotion)
 router.patch('/:id', updatePromotion)
 router.delete('/:id', deletePromotionById)
-router.get('/token/:token', getPromotionByToken)
-router.post('/token', createPromotionUser)
-
 
 export default router;
