@@ -191,7 +191,7 @@ export async function sendPaymentRequestEmail(
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>💳 Yêu cầu thanh toán</h1>
+                    <h1>Yêu cầu thanh toán</h1>
                 </div>
                 <div class="content">
                     <p>Xin chào <strong>${toName}</strong>,</p>
@@ -224,7 +224,7 @@ export async function sendPaymentRequestEmail(
                         </div>
                     </div>
                     
-                    <p style="color: #ff6b6b; font-weight: bold;">⚠️ Lưu ý: Vui lòng hoàn tất thanh toán để giữ chỗ của bạn.</p>
+                    <p style="color: #ff6b6b; font-weight: bold;">Lưu ý: Vui lòng hoàn tất thanh toán để giữ chỗ của bạn.</p>
                     
                     <center>
                         <a href="https://latedev.com/payment" class="button">Thanh toán ngay</a>
@@ -257,10 +257,10 @@ export async function sendPaymentRequestEmail(
             subject: `Yêu cầu thanh toán - Đơn hàng ${orderData.code}`,
             htmlContent: htmlContent,
         });
-        console.log('Payment request email sent successfully:', data);
+        console.log('Order email success:', data);
         return { success: true, data };
     } catch (error) {
-        console.error('Error sending payment request email:', error);
+        console.error('Error order email:', error);
         return { success: false, error };
     }
 }
@@ -304,11 +304,6 @@ export async function sendPaymentSuccessEmail(
                     padding: 30px;
                     border-radius: 0 0 8px 8px;
                 }
-                .success-icon {
-                    text-align: center;
-                    font-size: 64px;
-                    margin: 20px 0;
-                }
                 .order-info {
                     background-color: #f8f9fa;
                     padding: 20px;
@@ -348,11 +343,9 @@ export async function sendPaymentSuccessEmail(
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>✅ Thanh toán thành công!</h1>
+                    <h1>Thanh toán thành công!</h1>
                 </div>
-                <div class="content">
-                    <div class="success-icon">🎉</div>
-                    
+                <div class="content">                    
                     <p>Xin chào <strong>${toName}</strong>,</p>
                     
                     <p>Cảm ơn bạn đã thanh toán! Đơn hàng của bạn đã được xác nhận thành công.</p>
@@ -382,7 +375,7 @@ export async function sendPaymentSuccessEmail(
                     </div>
                     
                     <p style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                        ✨ Bạn có thể xem chi tiết đặt chỗ và vé của mình trong phần quản lý đặt chỗ.
+                        Bạn có thể xem chi tiết đặt chỗ và vé của mình trong phần quản lý đặt chỗ.
                     </p>
                     
                     <center>
@@ -416,10 +409,10 @@ export async function sendPaymentSuccessEmail(
             subject: `Thanh toán thành công - Đơn hàng ${orderData.code}`,
             htmlContent: htmlContent,
         });
-        console.log('Payment success email sent successfully:', data);
+        console.log('Payment mail success:', data);
         return { success: true, data };
     } catch (error) {
-        console.error('Error sending payment success email:', error);
+        console.error('Error payment mail:', error);
         return { success: false, error };
     }
 }

@@ -25,7 +25,6 @@ export async function createAccount(req: Request, res: Response) {
         const {passwordHash, ...acc} = account 
         const token = jwt.sign({ id: account.id }, process.env.SECRET_KEY, { expiresIn: "24h" });
 
-        // Send welcome email (non-blocking)
         sendWelcomeEmail(account.email, account.name).catch(err => {
             console.error('Failed to send welcome email:', err);
         });
@@ -51,13 +50,13 @@ export async function login(req: Request, res: Response) {
         });
 
         if (!user) {
-            return res.status(404).json({ message: "Email or password is not correct" });
+            return res.status(404).json({ message: "Email hoặc mật khẩu không đúng" });
         }
 
         const isPassValid = await argon2.verify(user.passwordHash, password);
 
         if (!isPassValid) {
-            return res.status(404).json({ message: "Email or password is not correct" });
+            return res.status(404).json({ message: "Email hoặc mật khẩu không đúng" });
         }
 
         const token = jwt.sign({ id: user.id }, process.env.SECRET_KEY, { expiresIn: "24h" });
@@ -135,7 +134,7 @@ export async function changePassword(req: Request, res: Response) {
         }
 
         if (oldPassword === newPassword) {
-            return res.status(400).json({ message: "New password must be different from old password" });
+            return res.status(400).json({ message: "Mật khẩu mới phải khác mật khẩu cũ" });
         }
 
         const newHashedPass = await argon2.hash(newPassword);
@@ -146,7 +145,7 @@ export async function changePassword(req: Request, res: Response) {
             },
         });
 
-        return res.status(200).json({ message: "Password changed successfully" });
+        return res.status(200).json({ message: "Đổi mật khẩu thành công" });
 
     } catch (error: any) {
         console.log("Change Password Error:", error);
@@ -177,7 +176,6 @@ export async function deleteAccount(req: Request, res: Response) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Delete user account
         await prisma.user.delete({
             where: { id: user.id },
         });

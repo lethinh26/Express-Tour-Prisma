@@ -4,8 +4,29 @@ const jwt = require('jsonwebtoken');
 
 export async function getTours(req: Request, res: Response) {
     try {
-        const tours = await prisma.tour.findMany();
-        res.json(tours || []);
+        const tours = await prisma.tour.findMany({
+            include: {
+                reviews: {
+                    select: {
+                        rating: true
+                    }
+                }
+            }
+        });
+
+        const toursWithRating = tours.map(tour => {
+            const totalRating = tour.reviews.reduce((sum, review) => sum + review.rating, 0);
+            const averageRating = tour.reviews.length > 0 ? totalRating / tour.reviews.length : 0;
+            const { reviews, ...tourWithoutReviews } = tour;
+            
+            return {
+                ...tourWithoutReviews,
+                averageRating: Number(averageRating.toFixed(1)),
+                totalReviews: tour.reviews.length
+            };
+        });
+
+        res.json(toursWithRating || []);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal server error', data: [] });

@@ -171,8 +171,8 @@ export async function createPayment(req: Request, res: Response) {
       const order = updatedPayment.order;
       const firstItem = order.items[0];
       const tourName = firstItem?.departure?.tour?.name || 'Tour';
-      const departureDate = firstItem?.departure?.departureDate 
-        ? new Date(firstItem.departure.departureDate).toLocaleDateString('vi-VN')
+      const departureDate = firstItem?.departure?.departure
+        ? new Date(firstItem.departure.departure).toLocaleDateString('vi-VN')
         : 'N/A';
       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -266,8 +266,6 @@ export async function updatePayment(req: Request, res: Response) {
         });
       }
       
-      console.log('Order updated to PAID and seats decreased:', currentPayment.orderId);
-
       if (order.user) {
         const firstItem = order.items[0];
         const tourName = firstItem?.departure?.tour?.name || 'Tour';
@@ -548,8 +546,8 @@ export async function handleSepayIPN(req: Request, res: Response) {
       if (order.user) {
         const firstItem = order.items[0];
         const tourName = firstItem?.departure?.tour?.name || 'Tour';
-        const departureDate = firstItem?.departure?.departureDate 
-          ? new Date(firstItem.departure.departureDate).toLocaleDateString('vi-VN')
+        const departureDate = firstItem?.departure?.departure
+          ? new Date(firstItem.departure.departure).toLocaleDateString('vi-VN')
           : 'N/A';
         const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
