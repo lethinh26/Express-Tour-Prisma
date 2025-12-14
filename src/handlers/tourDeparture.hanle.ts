@@ -114,16 +114,32 @@ export async function deleteTourDepartureByTourId(req: Request, res: Response) {
             return res.status(400).json({ message: 'Invalid tour ID' });
         }
 
+        const departures = await prisma.tourDeparture.findMany({
+            where: { tourId },
+            include: {
+                items: true
+            }
+        });
+
+        if (departures.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy departure của tour này' });
+        }
+
+        const departuresWithOrders = departures.filter(dep => dep.items.length > 0);
+        
+        if (departuresWithOrders.length > 0) {
+            const departureDate = new Date(departuresWithOrders[0].departure).toLocaleDateString('vi-VN');
+            return res.status(400).json({ 
+                message: `Không thể xóa vì đã có order ở departure ngày ${departureDate}` 
+            });
+        }
+
         const result = await prisma.tourDeparture.deleteMany({
             where: { tourId }
         });
 
-        if (result.count === 0) {
-            return res.status(404).json({ message: 'ko tìm thấy departure của tour này' });
-        }
-
         res.json({
-            message: 'All tour departures deleted successfully',
+            message: 'Đã xóa tất cả lịch khởi hành thành công',
             count: result.count
         });
 

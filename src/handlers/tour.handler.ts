@@ -182,6 +182,22 @@ export async function deleteTour(req: Request, res: Response) {
     try {
         const id = Number(req.params.id)
 
+        const departures = await prisma.tourDeparture.findMany({
+            where: { tourId: id },
+            include: {
+                items: true
+            }
+        });
+
+        const departuresWithOrders = departures.filter(dep => dep.items.length > 0);
+        
+        if (departuresWithOrders.length > 0) {
+            const departureDate = new Date(departuresWithOrders[0].departure).toLocaleDateString('vi-VN');
+            return res.status(400).json({ 
+                message: `Không thể xóa tour vì đã có order ở departure ngày ${departureDate}` 
+            });
+        }
+
         await prisma.$transaction([
             prisma.tourImage.deleteMany({ where: { tourId: id } }),
             
