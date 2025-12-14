@@ -4,15 +4,60 @@ const jwt = require('jsonwebtoken');
 
 export async function getTours(req: Request, res: Response) {
     try {
-        const tours = await prisma.tour.findMany({
-            include: {
-                reviews: {
-                    select: {
-                        rating: true
+        const { 
+            page = '1', 
+            pageSize = '6', 
+            categoryId, 
+            minPrice, 
+            maxPrice, 
+            search,
+            location,
+            sortBy = 'createdAt',
+            sortOrder = 'desc'
+        } = req.query;
+
+        const pageNum = parseInt(page as string);
+        const pageSizeNum = parseInt(pageSize as string);
+        const skip = (pageNum - 1) * pageSizeNum;
+
+        const where: any = {};
+        
+        if (categoryId) {
+            where.categoryId = parseInt(categoryId as string);
+        }
+        
+        if (search) {
+            where.name = {
+                contains: search as string,
+                mode: 'insensitive'
+            };
+        }
+
+        if (location) {
+            where.address = {
+                contains: location as string,
+                mode: 'insensitive'
+            };
+        }
+
+        const [tours, total] = await Promise.all([
+            prisma.tour.findMany({
+                where,
+                skip,
+                take: pageSizeNum,
+                include: {
+                    reviews: {
+                        select: {
+                            rating: true
+                        }
                     }
+                },
+                orderBy: {
+                    [sortBy as string]: sortOrder as 'asc' | 'desc'
                 }
-            }
-        });
+            }),
+            prisma.tour.count({ where })
+        ]);
 
         const toursWithRating = tours.map(tour => {
             const totalRating = tour.reviews.reduce((sum, review) => sum + review.rating, 0);
@@ -26,7 +71,25 @@ export async function getTours(req: Request, res: Response) {
             };
         });
 
-        res.json(toursWithRating || []);
+        let filteredTours = toursWithRating;
+        if (minPrice || maxPrice) {
+            filteredTours = toursWithRating.filter(tour => {
+                const price = Number(tour.basePrice);
+                const min = minPrice ? parseFloat(minPrice as string) : 0;
+                const max = maxPrice ? parseFloat(maxPrice as string) : Infinity;
+                return price >= min && price <= max;
+            });
+        }
+
+        res.json({
+            data: filteredTours,
+            pagination: {
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total,
+                totalPages: Math.ceil(total / pageSizeNum)
+            }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal server error', data: [] });
