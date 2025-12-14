@@ -105,3 +105,22 @@ export async function deleteTourDeparture(req: Request, res: Response) {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+export async function deleteTourDepartureByTourId(req: Request, res: Response) {
+    try {
+        const tourId = Number(req.params.tourId);
+
+        const result = await prisma.tourDeparture.deleteMany({
+            where: { tourId }
+        });
+
+        res.json({
+            message: 'All tour departures deleted successfully',
+            count: result.count
+        });
+
+    } catch (error: any) {
+        console.error(error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}

@@ -235,7 +235,7 @@ export async function updatePayment(req: Request, res: Response) {
     });
 
     if (updateData.status === PaymentStatus.SUCCESS && currentPayment.orderId) {
-      // Update order status to PAID
+
       const order = await prisma.order.update({
         where: { id: currentPayment.orderId },
         data: {

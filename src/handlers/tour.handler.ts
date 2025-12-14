@@ -182,9 +182,17 @@ export async function deleteTour(req: Request, res: Response) {
     try {
         const id = Number(req.params.id)
 
-        await prisma.tour.delete({
-            where: { id }
-        })
+        await prisma.$transaction([
+            prisma.tourImage.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tourFavorited.deleteMany({ where: { tourId: id } }),
+            
+            prisma.review.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tourDeparture.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tour.delete({ where: { id } })
+        ])
 
         res.json({message: 'Tour deleted successfully'})
 
@@ -192,6 +200,9 @@ export async function deleteTour(req: Request, res: Response) {
         console.error(error)
         if (error.code === 'P2025') {
             return res.status(404).json({message: 'Tour not found'})
+        }
+        if (error.code === 'P2003') {
+            return res.status(400).json({message: 'Cannot delete tour with existing orders'})
         }
         res.status(500).json({message: 'Internal server error'})
     }
