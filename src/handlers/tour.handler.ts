@@ -4,8 +4,90 @@ const jwt = require('jsonwebtoken');
 
 export async function getTours(req: Request, res: Response) {
     try {
-        const tours = await prisma.tour.findMany();
-        res.json(tours || []);
+        const { 
+            page = '1', 
+            pageSize = '6', 
+            categoryId, 
+            minPrice, 
+            maxPrice, 
+            search,
+            location,
+            sortBy = 'createdAt',
+            sortOrder = 'desc'
+        } = req.query;
+
+        const pageNum = parseInt(page as string);
+        const pageSizeNum = parseInt(pageSize as string);
+        const skip = (pageNum - 1) * pageSizeNum;
+
+        const where: any = {};
+        
+        if (categoryId) {
+            where.categoryId = parseInt(categoryId as string);
+        }
+        
+        if (search) {
+            where.name = {
+                contains: search as string
+            };
+        }
+
+        if (location) {
+            where.address = {
+                contains: location as string
+            };
+        }
+
+        const [tours, total] = await Promise.all([
+            prisma.tour.findMany({
+                where,
+                skip,
+                take: pageSizeNum,
+                include: {
+                    reviews: {
+                        select: {
+                            rating: true
+                        }
+                    }
+                },
+                orderBy: {
+                    [sortBy as string]: sortOrder as 'asc' | 'desc'
+                }
+            }),
+            prisma.tour.count({ where })
+        ]);
+
+        const toursWithRating = tours.map(tour => {
+            const totalRating = tour.reviews.reduce((sum, review) => sum + review.rating, 0);
+            const averageRating = tour.reviews.length > 0 ? totalRating / tour.reviews.length : 0;
+            const { reviews, ...tourWithoutReviews } = tour;
+            
+            return {
+                ...tourWithoutReviews,
+                averageRating: Number(averageRating.toFixed(1)),
+                totalReviews: tour.reviews.length
+            };
+        });
+
+        let filteredTours = toursWithRating;
+        if (minPrice || maxPrice) {
+            filteredTours = toursWithRating.filter(tour => {
+                const price = Number(tour.basePrice);
+                const min = minPrice ? parseFloat(minPrice as string) : 0;
+                const max = maxPrice ? parseFloat(maxPrice as string) : Infinity;
+                return price >= min && price <= max;
+            });
+        }
+
+        res.json({
+            data: filteredTours,
+            pagination: {
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total,
+                totalPages: Math.ceil(total / pageSizeNum)
+            }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal server error', data: [] });
@@ -98,9 +180,33 @@ export async function deleteTour(req: Request, res: Response) {
     try {
         const id = Number(req.params.id)
 
-        await prisma.tour.delete({
-            where: { id }
-        })
+        const departures = await prisma.tourDeparture.findMany({
+            where: { tourId: id },
+            include: {
+                items: true
+            }
+        });
+
+        const departuresWithOrders = departures.filter(dep => dep.items.length > 0);
+        
+        if (departuresWithOrders.length > 0) {
+            const departureDate = new Date(departuresWithOrders[0].departure).toLocaleDateString('vi-VN');
+            return res.status(400).json({ 
+                message: `Không thể xóa tour vì đã có order ở departure ngày ${departureDate}` 
+            });
+        }
+
+        await prisma.$transaction([
+            prisma.tourImage.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tourFavorited.deleteMany({ where: { tourId: id } }),
+            
+            prisma.review.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tourDeparture.deleteMany({ where: { tourId: id } }),
+            
+            prisma.tour.delete({ where: { id } })
+        ])
 
         res.json({message: 'Tour deleted successfully'})
 
@@ -108,6 +214,9 @@ export async function deleteTour(req: Request, res: Response) {
         console.error(error)
         if (error.code === 'P2025') {
             return res.status(404).json({message: 'Tour not found'})
+        }
+        if (error.code === 'P2003') {
+            return res.status(400).json({message: 'Không thể xoá tour đã có orders'})
         }
         res.status(500).json({message: 'Internal server error'})
     }
@@ -153,20 +262,46 @@ export async function countAllTours(req: Request, res: Response) {
 
 export async function createReview(req: Request, res: Response) {
     try {
-        const { tourId, userId, rating, comment } = req.body;
+        const { tourId, userId, rating, comment, orderId } = req.body;
 
-        if (!tourId || !userId || !rating) {
-            return res.status(400).json({ message: 'Missing required fields: tourId, userId, rating' });
+        if (!tourId || !userId || !rating || !orderId) {
+            return res.status(400).json({ message: 'Missing required fields: tourId, userId, rating, orderId' });
         }
 
         if (rating < 1 || rating > 10) {
             return res.status(400).json({ message: 'Rating must be between 1 and 10' });
         }
 
+        const order = await prisma.order.findFirst({
+            where: {
+                id: Number(orderId),
+                userId: Number(userId),
+                status: 'PAID'
+            }
+        });
+
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found or not paid' });
+        }
+
+        const existingReview = await prisma.review.findUnique({
+            where: {
+                orderId_userId: {
+                    orderId: Number(orderId),
+                    userId: Number(userId)
+                }
+            }
+        });
+
+        if (existingReview) {
+            return res.status(400).json({ message: 'You have already reviewed this order' });
+        }
+
         const review = await prisma.review.create({
             data: {
                 tourId: Number(tourId),
                 userId: Number(userId),
+                orderId: Number(orderId),
                 rating: Number(rating),
                 comment: comment || null
             },
@@ -302,6 +437,44 @@ export async function getUserReviewForTour(req: Request, res: Response) {
             where: {
                 tourId: tourId,
                 userId: userId
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!review) {
+            return res.json({ hasReviewed: false, review: null });
+        }
+
+        res.json({ hasReviewed: true, review: review });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export async function getOrderReview(req: Request, res: Response) {
+    try {
+        const orderId = Number(req.params.orderId);
+        const userId = Number(req.params.userId);
+
+        if (isNaN(orderId) || isNaN(userId)) {
+            return res.status(400).json({ message: 'Invalid order ID or user ID' });
+        }
+
+        const review = await prisma.review.findUnique({
+            where: {
+                orderId_userId: {
+                    orderId: orderId,
+                    userId: userId
+                }
             },
             include: {
                 user: {
