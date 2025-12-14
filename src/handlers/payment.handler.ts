@@ -541,8 +541,6 @@ export async function handleSepayIPN(req: Request, res: Response) {
         });
       }
       
-      console.log('Order updated to PAID and seats decreased:', payment.orderId);
-
       if (order.user) {
         const firstItem = order.items[0];
         const tourName = firstItem?.departure?.tour?.name || 'Tour';

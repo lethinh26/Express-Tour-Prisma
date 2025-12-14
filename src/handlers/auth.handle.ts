@@ -126,7 +126,7 @@ export async function changePassword(req: Request, res: Response) {
         }
 
         const isOldPassValid = await argon2.verify(user.passwordHash, oldPassword);
-        console.log(isOldPassValid);
+        // console.log(isOldPassValid);
         
 
         if (!isOldPassValid) {

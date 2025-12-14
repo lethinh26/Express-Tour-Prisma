@@ -379,6 +379,22 @@ export async function createPromotionUser(req: Request, res: Response) {
     if (checkExist.length) {
       return res.status(402).json({ message: "Information is existed" })
     }
+
+    const promotion = await prisma.promotion.findUnique({
+      where: { id: promotionId }
+    })
+    if (!promotion) {
+      return res.status(404).json({ message: "Promotion not found" })
+    }
+    if (promotion.amount <= 0) {
+      return res.status(400).json({ message: "Promotion is out of stock" })
+    }
+
+    await prisma.promotion.update({
+      where: { id: promotionId },
+      data: { amount: promotion.amount - 1 }
+    })
+
     const promotionUser = await prisma.promotionUser.create({
       data: {
         userId: decoded.id,
