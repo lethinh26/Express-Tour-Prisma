@@ -110,9 +110,17 @@ export async function deleteTourDepartureByTourId(req: Request, res: Response) {
     try {
         const tourId = Number(req.params.tourId);
 
+        if (isNaN(tourId)) {
+            return res.status(400).json({ message: 'Invalid tour ID' });
+        }
+
         const result = await prisma.tourDeparture.deleteMany({
             where: { tourId }
         });
+
+        if (result.count === 0) {
+            return res.status(404).json({ message: 'ko tìm thấy departure của tour này' });
+        }
 
         res.json({
             message: 'All tour departures deleted successfully',

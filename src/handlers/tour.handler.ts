@@ -202,7 +202,7 @@ export async function deleteTour(req: Request, res: Response) {
             return res.status(404).json({message: 'Tour not found'})
         }
         if (error.code === 'P2003') {
-            return res.status(400).json({message: 'Cannot delete tour with existing orders'})
+            return res.status(400).json({message: 'Không thể xoá tour đã có orders'})
         }
         res.status(500).json({message: 'Internal server error'})
     }
