@@ -28,15 +28,13 @@ export async function getTours(req: Request, res: Response) {
         
         if (search) {
             where.name = {
-                contains: search as string,
-                mode: 'insensitive'
+                contains: search as string
             };
         }
 
         if (location) {
             where.address = {
-                contains: location as string,
-                mode: 'insensitive'
+                contains: location as string
             };
         }
 
