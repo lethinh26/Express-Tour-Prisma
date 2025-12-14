@@ -128,7 +128,11 @@ export async function deleteTourDepartureByTourId(req: Request, res: Response) {
         });
 
     } catch (error: any) {
-        console.error(error);
+        console.error('Error in deleteTourDepartureByTourId:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
         res.status(500).json({ message: "Internal server error" });
     }
 }
