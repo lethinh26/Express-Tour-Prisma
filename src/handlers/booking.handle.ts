@@ -318,6 +318,15 @@ export async function getTopTour(req: Request, res: Response) {
 
         const topTours = await prisma.orderItem.groupBy({
             by: ["tourDepartureId"],
+            where: {
+                order: {
+                    payments: {
+                        some: {
+                            status: "SUCCESS",
+                        },
+                    },
+                },
+            },
             _count: {
                 id: true,
             },
