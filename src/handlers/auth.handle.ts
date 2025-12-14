@@ -153,6 +153,55 @@ export async function changePassword(req: Request, res: Response) {
     }
 }
 
+export async function updateUserInfo(req: Request, res: Response) {
+    try {
+        const { token, name, phoneNumber } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: "Missing token" });
+        }
+
+        let decoded: any;
+        try {
+            decoded = jwt.verify(token, process.env.SECRET_KEY as string);
+        } catch (err) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const updateData: any = {};
+        if (name && name.trim() !== "") {
+            updateData.name = name.trim();
+        }
+        if (phoneNumber && phoneNumber.trim() !== "") {
+            updateData.phoneNumber = phoneNumber.trim();
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ message: "No fields to update" });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+        });
+
+        const { passwordHash, ...rest } = updatedUser;
+        return res.status(200).json({ message: "Cập nhật thông tin thành công", user: rest });
+
+    } catch (error: any) {
+        console.log("Update User Info Error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
 export async function deleteAccount(req: Request, res: Response) {
     try {
         const { token } = req.body;
