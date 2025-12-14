@@ -27,13 +27,14 @@ export async function checkPromotionUsable(req: Request, res: Response) {
     }
 
     if (promotion.type === "NEW") {
-      const ordersCount = await prisma.order.count({
+      const successPaymentsCount = await prisma.payment.count({
         where: {
           userId: userId,
+          status: "SUCCESS"
         },
       });
 
-      if (ordersCount > 0) {
+      if (successPaymentsCount > 0) {
         return res.status(400).json({ message: "Promotion only for new users" });
       }
     }
@@ -128,13 +129,14 @@ export async function usePromotion(req: Request, res: Response) {
     }
 
     if (promotion.type === "NEW") {
-      const ordersCount = await prisma.order.count({
+      const successPaymentsCount = await prisma.payment.count({
         where: {
           userId: Number(userId),
+          status: "SUCCESS"
         },
       });
 
-      if (ordersCount > 0) {
+      if (successPaymentsCount > 0) {
         return res.status(400).json({ message: "Promotion only for new users" });
       }
     }
